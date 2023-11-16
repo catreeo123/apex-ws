@@ -1,22 +1,24 @@
 {
-  "name": "apex-ws",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^6.11.0",
-    "@typescript-eslint/parser": "^6.11.0",
-    "eslint": "^8.53.0",
-    "eslint-plugin-prettier": "^5.0.1",
-    "prettier": "^3.1.0",
-    "typescript": "^5.2.2"
-  },
-  "dependencies": {
-    "rxjs": "^7.8.1"
-  }
+    "name": "apex-ws",
+    "version": "1.0.0",
+    "description": "Typescript APEX client ",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "Ukkarawin Pansuaprak",
+    "license": "ISC",
+    "devDependencies": {
+        "@types/ws": "^8.5.9",
+        "@typescript-eslint/eslint-plugin": "^6.11.0",
+        "@typescript-eslint/parser": "^6.11.0",
+        "eslint": "^8.53.0",
+        "eslint-plugin-prettier": "^5.0.1",
+        "prettier": "^3.1.0",
+        "typescript": "^5.2.2"
+    },
+    "dependencies": {
+        "rxjs": "^7.8.1",
+        "ws": "^8.14.2"
+    }
 }
