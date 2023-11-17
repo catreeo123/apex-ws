@@ -20,5 +20,9 @@
     "dependencies": {
         "rxjs": "^7.8.1",
         "ws": "^8.14.2"
+    },
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/catreeo123/apex-ws"
     }
 }
