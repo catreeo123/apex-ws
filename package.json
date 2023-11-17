@@ -1,6 +1,6 @@
 {
     "name": "apex-ws",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Typescript APEX client ",
     "main": "index.js",
     "scripts": {
@@ -22,7 +22,7 @@
         "ws": "^8.14.2"
     },
     "repository": {
-      "type": "git",
-      "url": "https://github.com/catreeo123/apex-ws"
+        "type": "git",
+        "url": "https://github.com/catreeo123/apex-ws"
     }
 }
