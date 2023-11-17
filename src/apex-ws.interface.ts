@@ -33,7 +33,7 @@ export interface MessageFrame {
 }
 
 // e.g. APClient<typeof endpoints> from const endpoints = string[] as const
-export type APClient<T extends readonly string[]> = Record<
+export type ApClient<T extends readonly string[]> = Record<
     T[number],
     (params: any) => Promise<any>
 >
