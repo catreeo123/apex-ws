@@ -2,8 +2,15 @@
     "name": "apex-ws",
     "version": "1.0.3",
     "description": "Typescript APEX client ",
-    "main": "index.js",
+    "main": "./dist/index.js",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.ts",
+    "files": [
+        "dist"
+    ],
     "scripts": {
+        "build": "tsup",
+        "build:npm": "tsup && npm publish",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "author": "Ukkarawin Pansuaprak",
@@ -15,6 +22,7 @@
         "eslint": "^8.53.0",
         "eslint-plugin-prettier": "^5.0.1",
         "prettier": "^3.1.0",
+        "tsup": "^7.3.0",
         "typescript": "^5.2.2"
     },
     "dependencies": {

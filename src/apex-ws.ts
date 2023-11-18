@@ -27,6 +27,10 @@ export class ApexWebSocket {
     }
 
     async createClient() {
+        // if seq > 0, means we are retrying to connect
+        // so we need to delay before create new connection
+        // to avoid multiple connections at the same time
+        // and to avoid multiple login requests
         if (this.seq > 0) {
             await this.delay(this.options.delayBeforeRetryConnectMs)
         }
@@ -37,6 +41,7 @@ export class ApexWebSocket {
                 this.createTimes,
             )
         }
+        // create websocket connection if not exist
         if (!this.ws || this.ws?.closed) {
             try {
                 this.seq = 0
@@ -51,7 +56,7 @@ export class ApexWebSocket {
                                   log(`AP ${username}: Connection established`)
                               },
                     },
-                    // retry create new connection
+                    // retry to create new connection when received close event
                     closeObserver: {
                         next: this.options.onClose
                             ? this.options.onClose
@@ -71,18 +76,31 @@ export class ApexWebSocket {
                 })
                 this.ws.subscribe({
                     next: (data: MessageFrame) => {
+                        // if received logout event create the new connection for new session token
                         if (
                             data.m === MessageFrameType.EVENT &&
                             data.n === 'LogoutEvent'
                         ) {
                             this.close()
                             this.createClient()
-                        } else if (this.callback[data.i]) {
-                            if (data.o === 'Endpoint Not Found') {
-                                this.login()
-                            }
+                        }
+                        // try to re-login if endpoint not found because of unauthorize
+                        else if (data.o === 'Endpoint Not Found') {
+                            log(
+                                `AP: ${data.n} (${data.i}): ${data.o}.Try to re-login`,
+                            )
+                            this.login()
+                        }
+                        // return the result to caller function
+                        else if (this.callback[data.i]) {
                             try {
                                 this.callback[data.i](data)
+                            } catch (error) {
+                                console.debug(
+                                    JSON.stringify({
+                                        message: `AP: ${data.n} (${data.i}): ${error.message}`,
+                                    }),
+                                )
                             } finally {
                                 delete this.callback[data.i]
                             }

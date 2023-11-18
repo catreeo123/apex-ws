@@ -66,3 +66,5 @@ coverage/**
 
 test-run-report.json
 test-run-report.json.html
+
+test.ts
