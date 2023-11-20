@@ -1,16 +1,22 @@
 export interface ApexWebSocketOptions {
+    // AP websocket server url
     url: string
+    // custom function to run when the websocket connected
     onOpen?: (value?: Event) => void
+    // custom function to run when the websocket closed
     onClose?: (value?: Event) => void
+    // username and password of AP account
     credentials: {
         username: string
         password: string
     }
+    // log more information in the send seq, function name, and payload
     debugMode?: boolean
-    delayBeforeRetryConnectMs?: number
-    prettyPrint?: boolean
 
-    endpoints: readonly string[]
+    // delay before retry to create connection in millisecond
+    delayBeforeRetryConnectMs?: number
+    // add 2 space of JSON stringify to print debugMode log
+    prettyPrint?: boolean
 }
 
 export const enum MessageFrameType {

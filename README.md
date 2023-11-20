@@ -11,5 +11,8 @@ const apexWebSocket = new ApexWebSocket({
             },
             endpoints: endpoints,
         })
-const client: ApClient<typeof endpoints> = await apexWebSocket.getClient()
+// if using value variable need making it as const like define above
+const client = await apexWebSocket.getClient(endpoints)
+// OR can pass array directly to making autocomplete of endpoint work
+const client = await apexWebSocket.getClient(['functionName1', 'functionName2'])
 ```

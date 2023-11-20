@@ -5,7 +5,7 @@ import {
     MessageFrame,
     MessageFrameType,
 } from './apex-ws.interface'
-import { log, sleep } from './utils'
+import { customError, customLog, sleep } from './utils'
 
 export class ApexWebSocket {
     private options: ApexWebSocketOptions
@@ -16,6 +16,7 @@ export class ApexWebSocket {
     private callback = {}
     private debugMode: boolean
     private isLogin = false
+    private endpoints = [] as readonly string[]
 
     constructor(options: ApexWebSocketOptions) {
         this.options = {
@@ -36,13 +37,14 @@ export class ApexWebSocket {
         }
         if (this.debugMode) {
             this.createTimes++
-            log(
+            customLog(
                 `AP: Create connection: ${this.createTimes}} times`,
                 this.createTimes,
             )
         }
         // create websocket connection if not exist
         if (!this.ws || this.ws?.closed) {
+            customLog('AP: Creating connection')
             try {
                 this.seq = 0
                 this.isLogin = false
@@ -53,22 +55,33 @@ export class ApexWebSocket {
                             ? this.options.onOpen
                             : () => {
                                   const { username } = this.options.credentials
-                                  log(`AP ${username}: Connection established`)
+                                  customLog(
+                                      `AP ${username}: Connection established`,
+                                  )
                               },
+                    },
+                    closingObserver: {
+                        next: () => {
+                            customLog(
+                                'AP: Received complete event by close function',
+                            )
+                        },
                     },
                     // retry to create new connection when received close event
                     closeObserver: {
                         next: this.options.onClose
                             ? this.options.onClose
                             : async () => {
-                                  log('AP: Received Close Event')
+                                  customLog('AP: Received close event')
                                   this.close()
                                   this.createClient()
                               },
                     },
+                    // use custom serializer for nest object
                     serializer: (value: MessageFrame) => {
                         return this.serializer(value)
                     },
+                    // same as serializer for nest object string
                     deserializer: (e: MessageEvent) => {
                         return this.deserializer(e.data)
                     },
@@ -86,7 +99,7 @@ export class ApexWebSocket {
                         }
                         // try to re-login if endpoint not found because of unauthorize
                         else if (data.o === 'Endpoint Not Found') {
-                            log(
+                            customLog(
                                 `AP: ${data.n} (${data.i}): ${data.o}.Try to re-login`,
                             )
                             this.login()
@@ -96,48 +109,54 @@ export class ApexWebSocket {
                             try {
                                 this.callback[data.i](data)
                             } catch (error) {
-                                console.debug(
-                                    JSON.stringify({
-                                        message: `AP: ${data.n} (${data.i}): ${error.message}`,
-                                    }),
-                                )
+                                customError(error)
+                                return undefined
                             } finally {
                                 delete this.callback[data.i]
                             }
                         }
                     },
-                    error: (err) => {
-                        console.error(err)
+                    error: (error) => {
+                        customError(error)
                     },
                     complete: () => {
-                        log('AP: Websocket connection is closed')
+                        customLog('AP: Websocket connection is closed')
                     },
                 })
                 await this.login()
-                this.addEndpoints(this.options.endpoints)
+                if (this.endpoints) {
+                    this.addEndpoints(this.endpoints)
+                }
             } catch (error) {
-                console.error(error)
+                customError(error)
             }
         }
     }
 
     async login() {
         if (this.isLogin) {
-            log(
-                'AP: Still have pending login request. Restart connection for new session token',
+            customLog(
+                `AP: A Login Skipped. There is still a pending login request.`,
             )
-            this.close()
-            await this.createClient()
+            return
         }
         this.isLogin = true
-        log('AP: Pending Login')
+        customLog('AP: Pending Login')
         try {
             const { username, password } = this.options.credentials
+            // prevent login to stuck and skip forever
+            const loginTimeout = setTimeout(() => {
+                this.isLogin = false
+                customError('AP: Login Timeout, set isLogin to false')
+            }, 5000)
             const result = await this.authenticateUser(username, password)
-            log(`AP ${username}: AuthenticateUser`, {
+            clearTimeout(loginTimeout)
+            customLog(`AP ${username}: AuthenticateUser`, {
                 authenticate: result.Authenticated,
                 sessionToken: result.SessionToken,
             })
+        } catch (error) {
+            customError(error)
         } finally {
             this.isLogin = false
         }
@@ -145,6 +164,7 @@ export class ApexWebSocket {
 
     async close() {
         if (this.ws) {
+            customLog('AP: Connection is closing')
             this.ws.complete()
             this.ws = undefined
         }
@@ -204,7 +224,7 @@ export class ApexWebSocket {
             o: data,
         }
         if (this.debugMode) {
-            log(
+            customLog(
                 `AP: ${functionName} (${this.seq}): ${this.prettyJSONStringify(
                     data,
                 )}`,
@@ -222,10 +242,12 @@ export class ApexWebSocket {
     ): Promise<any> {
         return new Promise((resolve, reject) => {
             this.RPCCall(functionName, params, (data: MessageFrame) => {
-                if (data.m === MessageFrameType.ERROR) {
+                if (data.m !== MessageFrameType.REPLY) {
                     reject(
                         new Error(
-                            `AP ${functionName} error message: ${this.prettyJSONStringify(
+                            `AP ${functionName} ${
+                                data.i
+                            } error message: ${this.prettyJSONStringify(
                                 data.o,
                             )}`,
                         ),
@@ -241,20 +263,7 @@ export class ApexWebSocket {
         functionName: string,
     ): (params: Record<string, any>) => Promise<any> {
         return (params: Record<string, any>) =>
-            new Promise((resolve, reject) => {
-                this.RPCCall(functionName, params, (data: MessageFrame) => {
-                    if (data.m === MessageFrameType.ERROR) {
-                        reject(
-                            new Error(
-                                `AP ${functionName} error message: ${this.prettyJSONStringify(
-                                    data.o,
-                                )}`,
-                            ),
-                        )
-                    }
-                    resolve(data.o)
-                })
-            })
+            this.RPCPromise(functionName, params)
     }
 
     addEndpoints(endpoints: readonly string[]) {
@@ -275,8 +284,12 @@ export class ApexWebSocket {
         return this.RPCPromise('AuthenticateUser', { username, password })
     }
 
-    async getClient() {
+    async getClient<const T extends string[]>(
+        endpoints: readonly [...T],
+    ): Promise<Record<T[number], (params: any) => Promise<any>>> {
         await this.createClient()
+        this.endpoints = endpoints
+        this.addEndpoints(endpoints)
         return this.client
     }
 }
