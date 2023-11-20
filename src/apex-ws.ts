@@ -106,14 +106,8 @@ export class ApexWebSocket {
                         }
                         // return the result to caller function
                         else if (this.callback[data.i]) {
-                            try {
-                                this.callback[data.i](data)
-                            } catch (error) {
-                                customError(error)
-                                return undefined
-                            } finally {
-                                delete this.callback[data.i]
-                            }
+                            this.callback[data.i](data)
+                            delete this.callback[data.i]
                         }
                     },
                     error: (error) => {
@@ -123,7 +117,7 @@ export class ApexWebSocket {
                         customLog('AP: Websocket connection is closed')
                     },
                 })
-                await this.login()
+                // await this.login()
                 if (this.endpoints) {
                     this.addEndpoints(this.endpoints)
                 }
