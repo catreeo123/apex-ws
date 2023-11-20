@@ -117,7 +117,7 @@ export class ApexWebSocket {
                         customLog('AP: Websocket connection is closed')
                     },
                 })
-                // await this.login()
+                await this.login()
                 if (this.endpoints) {
                     this.addEndpoints(this.endpoints)
                 }
