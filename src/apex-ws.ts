@@ -14,6 +14,7 @@ export class ApexWebSocket {
     createTimes = 0
     private seq = 0
     private callback = {}
+    timeout = {}
     private debugMode: boolean
     private isLogin = false
     private endpoints = [] as readonly string[]
@@ -21,7 +22,8 @@ export class ApexWebSocket {
     constructor(options: ApexWebSocketOptions) {
         this.options = {
             prettyPrint: false,
-            delayBeforeRetryConnectMs: 500,
+            delayBeforeRetryConnect: 500,
+            requestTimeout: 10000,
             ...options,
         }
         this.debugMode = !!options.debugMode
@@ -33,7 +35,7 @@ export class ApexWebSocket {
         // to avoid multiple connections at the same time
         // and to avoid multiple login requests
         if (this.seq > 0) {
-            await this.delay(this.options.delayBeforeRetryConnectMs)
+            await this.delay(this.options.delayBeforeRetryConnect)
         }
         if (this.debugMode) {
             this.createTimes++
@@ -107,6 +109,8 @@ export class ApexWebSocket {
                         // return the result to caller function
                         else if (this.callback[data.i]) {
                             this.callback[data.i](data)
+                            clearTimeout(this.timeout[data.i])
+                            delete this.timeout[data.i]
                             delete this.callback[data.i]
                         }
                     },
@@ -226,6 +230,16 @@ export class ApexWebSocket {
             )
         }
         this.callback[this.seq] = callback
+        this.timeout[this.seq] = setTimeout(() => {
+            if (this.callback[this.seq]) {
+                this.callback[this.seq]({
+                    m: MessageFrameType.ERROR,
+                    i: this.seq,
+                    o: 'Request Time out',
+                })
+                delete this.callback[this.seq]
+            }
+        }, this.options.requestTimeout)
         this.seq += 2
         this.ws?.next(messageFrame)
     }

@@ -14,9 +14,12 @@ export interface ApexWebSocketOptions {
     debugMode?: boolean
 
     // delay before retry to create connection in millisecond
-    delayBeforeRetryConnectMs?: number
+    delayBeforeRetryConnect?: number
     // add 2 space of JSON stringify to print debugMode log
     prettyPrint?: boolean
+
+    // request timeout in millisecond
+    requestTimeout?: number
 }
 
 export const enum MessageFrameType {
