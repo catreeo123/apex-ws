@@ -23,20 +23,24 @@ export interface ApexWebSocketOptions {
         password: string
     }
     /**
+     * @default false
      * Log more information in the send seq, function name, and payload
      */
     debugMode?: boolean
 
     /**
+     * @default 500
      * Delay before retry to create connection in millisecond
      */
     delayBeforeRetryConnect?: number
     /**
+     * @default false
      * Add 2 space of JSON stringify to print debugMode log
      */
     prettyPrint?: boolean
 
     /**
+     * @default 10000
      * Request timeout in millisecond
      */
     requestTimeout?: number

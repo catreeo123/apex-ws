@@ -1,3 +1,13 @@
+# APEX WS
+
+## Installation
+
+```bash
+npm i apex-ws
+```
+
+## Usage
+
 ```typescript
 import { ApexWebSocket } from 'apex-ws'
 
@@ -15,4 +25,56 @@ const apexWebSocket = new ApexWebSocket({
 const client = await apexWebSocket.getClient(endpoints)
 // OR can pass array directly to making autocomplete of endpoint work
 const client = await apexWebSocket.getClient(['functionName1', 'functionName2'])
+```
+
+## Options
+
+```typescript
+export interface ApexWebSocketOptions {
+    /**
+     * AP websocket server url
+     */
+    url: string
+    /**
+     * Custom function to run when the websocket connected
+     * @param value
+     * @returns
+     */
+    onOpen?: (value?: Event) => void
+    /**
+     * Custom function to run when the websocket closed
+     * @param value
+     * @returns
+     */
+    onClose?: (value?: Event) => void
+    /**
+     * Username and Password of AP account
+     */
+    credentials: {
+        username: string
+        password: string
+    }
+    /**
+     * @default false
+     * Log more information in the send seq, function name, and payload
+     */
+    debugMode?: boolean
+
+    /**
+     * @default 500
+     * Delay before retry to create connection in millisecond
+     */
+    delayBeforeRetryConnect?: number
+    /**
+     * @default false
+     * Add 2 space of JSON stringify to print debugMode log
+     */
+    prettyPrint?: boolean
+
+    /**
+     * @default 10000
+     * Request timeout in millisecond
+     */
+    requestTimeout?: number
+}
 ```

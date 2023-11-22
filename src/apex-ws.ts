@@ -10,12 +10,12 @@ import { customError, customLog, sleep } from './utils'
 export class ApexWebSocket {
     private options: ApexWebSocketOptions
     ws: WebSocketSubject<MessageFrame> | undefined
-    client: any = {}
-    createTimes = 0
+    private client: any = {}
+    private createTimes = 0
     private seq = 0
     private callback = {}
     private timeout = {}
-    private debugMode: boolean
+    private debugMode = false
     private isLogin = false
     private isExit = false
     private endpoints = [] as readonly string[]
