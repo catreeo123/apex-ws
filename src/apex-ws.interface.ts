@@ -1,24 +1,44 @@
 export interface ApexWebSocketOptions {
-    // AP websocket server url
+    /**
+     * AP websocket server url
+     */
     url: string
-    // custom function to run when the websocket connected
+    /**
+     * Custom function to run when the websocket connected
+     * @param value
+     * @returns
+     */
     onOpen?: (value?: Event) => void
-    // custom function to run when the websocket closed
+    /**
+     * Custom function to run when the websocket closed
+     * @param value
+     * @returns
+     */
     onClose?: (value?: Event) => void
-    // username and password of AP account
+    /**
+     * Username and Password of AP account
+     */
     credentials: {
         username: string
         password: string
     }
-    // log more information in the send seq, function name, and payload
+    /**
+     * Log more information in the send seq, function name, and payload
+     */
     debugMode?: boolean
 
-    // delay before retry to create connection in millisecond
+    /**
+     * Delay before retry to create connection in millisecond
+     */
     delayBeforeRetryConnect?: number
-    // add 2 space of JSON stringify to print debugMode log
+    /**
+     * Add 2 space of JSON stringify to print debugMode log
+     */
     prettyPrint?: boolean
 
-    // request timeout in millisecond
+    /**
+     * Request timeout in millisecond
+     */
     requestTimeout?: number
 }
 

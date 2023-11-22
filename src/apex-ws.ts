@@ -30,7 +30,7 @@ export class ApexWebSocket {
         this.debugMode = !!options.debugMode
     }
 
-    async createClient() {
+    private async createClient() {
         // if seq > 0, means we are retrying to connect
         // so we need to delay before create new connection
         // to avoid multiple connections at the same time
@@ -134,7 +134,7 @@ export class ApexWebSocket {
         }
     }
 
-    async login() {
+    private async login() {
         if (this.isLogin) {
             customLog(
                 `AP: A Login Skipped. There is still a pending login request.`,
@@ -165,7 +165,9 @@ export class ApexWebSocket {
         }
     }
 
-    // use for close connection before retry to connect again
+    /**
+     * Use for close connection before retry to connect again
+     */
     close() {
         if (this.ws) {
             customLog('AP: Connection is closing')
@@ -174,19 +176,21 @@ export class ApexWebSocket {
         }
     }
 
-    // use when exit app to close connection and not retry
+    /**
+     * Use when exit app to close connection and not retry
+     */
     exit() {
         this.isExit = true
         this.close()
     }
 
-    async delay(time = 500) {
+    private async delay(time = 500) {
         if (time >= 0) {
             await sleep(time)
         }
     }
 
-    serializer(value: object): any {
+    private serializer(value: object): any {
         for (const key in value) {
             if (
                 typeof value[key] === 'object' &&
@@ -199,7 +203,7 @@ export class ApexWebSocket {
         return JSON.stringify(value)
     }
 
-    deserializer(value: string): any {
+    private deserializer(value: string): any {
         try {
             return JSON.parse(value, (_, val) => {
                 if (typeof val === 'string') return this.deserializer(val)
@@ -210,7 +214,7 @@ export class ApexWebSocket {
         }
     }
 
-    prettyJSONStringify(data: Record<string, any> | string) {
+    private prettyJSONStringify(data: Record<string, any> | string) {
         if (typeof data === 'string') return data
         if ('password' in data) {
             delete data.password
@@ -219,7 +223,7 @@ export class ApexWebSocket {
         return JSON.stringify(data, null, space)
     }
 
-    RPCCall(
+    private RPCCall(
         functionName: string,
         data: Record<string, any>,
         callback: Function,
@@ -262,7 +266,7 @@ export class ApexWebSocket {
         this.ws?.next(messageFrame)
     }
 
-    RPCPromise(
+    private RPCPromise(
         functionName: string,
         params: Record<string, any>,
     ): Promise<any> {
@@ -285,14 +289,14 @@ export class ApexWebSocket {
         })
     }
 
-    buildEndpoint(
+    private buildEndpoint(
         functionName: string,
     ): (params: Record<string, any>) => Promise<any> {
         return (params: Record<string, any>) =>
             this.RPCPromise(functionName, params)
     }
 
-    addEndpoints(endpoints: readonly string[]) {
+    private addEndpoints(endpoints: readonly string[]) {
         if (endpoints.length > 0) {
             endpoints.forEach((endpoint) => {
                 this.client[endpoint] = this.buildEndpoint(endpoint)
@@ -300,7 +304,7 @@ export class ApexWebSocket {
         }
     }
 
-    async authenticateUser(
+    private async authenticateUser(
         username: string,
         password: string,
     ): Promise<{
@@ -309,7 +313,9 @@ export class ApexWebSocket {
     }> {
         return this.RPCPromise('AuthenticateUser', { username, password })
     }
-
+    /**
+     * For create client and build endpoint from input endpoints for using in the future
+     */
     async getClient<const T extends string[]>(
         endpoints: readonly [...T],
     ): Promise<Record<T[number], (params: any) => Promise<any>>> {
