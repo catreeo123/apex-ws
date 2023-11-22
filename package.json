@@ -1,6 +1,6 @@
 {
     "name": "apex-ws",
-    "version": "1.0.5",
+    "version": "1.0.4",
     "description": "Typescript APEX client ",
     "main": "./dist/index.js",
     "module": "./dist/index.mjs",
@@ -10,7 +10,7 @@
     ],
     "scripts": {
         "build": "tsup",
-        "build:npm": "npm publish",
+        "build:npm": "tsup & npm publish",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "author": "Ukkarawin Pansuaprak",
