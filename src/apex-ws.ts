@@ -51,79 +51,8 @@ export class ApexWebSocket {
             try {
                 this.seq = 0
                 this.isLogin = false
-                this.ws = webSocket({
-                    url: this.options.url,
-                    openObserver: {
-                        next: this.options.onOpen
-                            ? this.options.onOpen
-                            : () => {
-                                  const { username } = this.options.credentials
-                                  customLog(
-                                      `AP ${username}: Connection established`,
-                                  )
-                              },
-                    },
-                    closingObserver: {
-                        next: () => {
-                            customLog(
-                                'AP: Received complete event by close function',
-                            )
-                        },
-                    },
-                    // retry to create new connection when received close event
-                    closeObserver: {
-                        next: this.options.onClose
-                            ? this.options.onClose
-                            : async () => {
-                                  customLog('AP: Received close event')
-                                  this.close()
-                                  if (!this.isExit) {
-                                      this.createClient()
-                                  }
-                              },
-                    },
-                    // use custom serializer for nest object
-                    serializer: (value: MessageFrame) => {
-                        return this.serializer(value)
-                    },
-                    // same as serializer for nest object string
-                    deserializer: (e: MessageEvent) => {
-                        return this.deserializer(e.data)
-                    },
-                    WebSocketCtor: (WebSocket as any).WebSocket,
-                })
-                this.ws.subscribe({
-                    next: (data: MessageFrame) => {
-                        // if received logout event create the new connection for new session token
-                        if (
-                            data.m === MessageFrameType.EVENT &&
-                            data.n === 'LogoutEvent'
-                        ) {
-                            this.close()
-                            this.createClient()
-                        }
-                        // try to re-login if endpoint not found because of unauthorize
-                        else if (data.o === 'Endpoint Not Found') {
-                            customLog(
-                                `AP: ${data.n} (${data.i}): ${data.o}.Try to re-login`,
-                            )
-                            this.login()
-                        }
-                        // return the result to caller function
-                        else if (this.callback[data.i]) {
-                            this.callback[data.i](data)
-                            clearTimeout(this.timeout[data.i])
-                            delete this.timeout[data.i]
-                            delete this.callback[data.i]
-                        }
-                    },
-                    error: (error) => {
-                        customError(error)
-                    },
-                    complete: () => {
-                        customLog('AP: Websocket connection is closed')
-                    },
-                })
+                this.ws = this.createWebSocket()
+                this.ws.subscribe(this.handleWebSocketReply())
                 await this.login()
                 if (this.endpoints) {
                     this.addEndpoints(this.endpoints)
@@ -132,6 +61,83 @@ export class ApexWebSocket {
                 customError(error)
             }
         }
+    }
+
+    private handleWebSocketReply() {
+        return {
+            next: (data: MessageFrame) => {
+                // if received logout event create the new connection for new session token
+                if (
+                    data.m === MessageFrameType.EVENT &&
+                    data.n === 'LogoutEvent'
+                ) {
+                    this.close()
+                    this.createClient()
+                }
+
+                // try to re-login if endpoint not found because of unauthorize
+                else if (data.o === 'Endpoint Not Found') {
+                    customLog(
+                        `AP: ${data.n} (${data.i}): ${data.o}.Try to re-login`,
+                    )
+                    this.login()
+                }
+
+                // return the result to caller function
+                else if (this.callback[data.i]) {
+                    this.callback[data.i](data)
+                    clearTimeout(this.timeout[data.i])
+                    delete this.timeout[data.i]
+                    delete this.callback[data.i]
+                }
+            },
+            error: (error) => {
+                customError(error)
+            },
+            complete: () => {
+                customLog('AP: Websocket connection is closed')
+            },
+        }
+    }
+
+    private createWebSocket(): WebSocketSubject<MessageFrame> {
+        return webSocket({
+            url: this.options.url,
+            openObserver: {
+                next: this.options.onOpen
+                    ? this.options.onOpen
+                    : () => {
+                          const { username } = this.options.credentials
+                          customLog(`AP ${username}: Connection established`)
+                      },
+            },
+            closingObserver: {
+                next: () => {
+                    customLog('AP: Received complete event by close function')
+                },
+            },
+            // retry to create new connection when received close event
+            closeObserver: {
+                next: this.options.onClose
+                    ? this.options.onClose
+                    : async () => {
+                          customLog('AP: Received close event')
+                          this.close()
+                          if (!this.isExit) {
+                              this.createClient()
+                          }
+                      },
+            },
+            // use custom serializer for nest object
+            serializer: (value: MessageFrame) => {
+                return this.serializer(value)
+            },
+            // same as serializer for nest object string
+            deserializer: (e: MessageEvent) => {
+                return this.deserializer(e.data)
+            },
+            WebSocketCtor: (WebSocket as any).WebSocket,
+        })
     }
 
     private async login() {
