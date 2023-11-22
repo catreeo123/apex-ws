@@ -14,9 +14,10 @@ export class ApexWebSocket {
     createTimes = 0
     private seq = 0
     private callback = {}
-    timeout = {}
+    private timeout = {}
     private debugMode: boolean
     private isLogin = false
+    private isExit = false
     private endpoints = [] as readonly string[]
 
     constructor(options: ApexWebSocketOptions) {
@@ -76,7 +77,9 @@ export class ApexWebSocket {
                             : async () => {
                                   customLog('AP: Received close event')
                                   this.close()
-                                  this.createClient()
+                                  if (!this.isExit) {
+                                      this.createClient()
+                                  }
                               },
                     },
                     // use custom serializer for nest object
@@ -144,8 +147,10 @@ export class ApexWebSocket {
             const { username, password } = this.options.credentials
             // prevent login to stuck and skip forever
             const loginTimeout = setTimeout(() => {
-                this.isLogin = false
-                customError('AP: Login Timeout, set isLogin to false')
+                if (this.isLogin) {
+                    this.isLogin = false
+                    customError('AP: Login Timeout, set isLogin to false')
+                }
             }, 5000)
             const result = await this.authenticateUser(username, password)
             clearTimeout(loginTimeout)
@@ -160,12 +165,19 @@ export class ApexWebSocket {
         }
     }
 
-    async close() {
+    // use for close connection before retry to connect again
+    close() {
         if (this.ws) {
             customLog('AP: Connection is closing')
             this.ws.complete()
             this.ws = undefined
         }
+    }
+
+    // use when exit app to close connection and not retry
+    exit() {
+        this.isExit = true
+        this.close()
     }
 
     async delay(time = 500) {
@@ -215,31 +227,37 @@ export class ApexWebSocket {
         if (!this.ws) {
             throw new Error('AP: Websocket is not connected')
         }
+        const seq = this.seq
         const messageFrame: MessageFrame = {
             m: MessageFrameType.REQUEST,
-            i: this.seq,
+            i: seq,
             n: functionName,
             o: data,
         }
         if (this.debugMode) {
             customLog(
-                `AP: ${functionName} (${this.seq}): ${this.prettyJSONStringify(
+                `AP: ${functionName} (${seq}): ${this.prettyJSONStringify(
                     data,
                 )}`,
                 data,
             )
         }
-        this.callback[this.seq] = callback
-        this.timeout[this.seq] = setTimeout(() => {
-            if (this.callback[this.seq]) {
-                this.callback[this.seq]({
-                    m: MessageFrameType.ERROR,
-                    i: this.seq,
-                    o: 'Request Time out',
-                })
-                delete this.callback[this.seq]
-            }
-        }, this.options.requestTimeout)
+        this.callback[seq] = callback
+        this.timeout[seq] = setTimeout(
+            () => {
+                if (this.callback[seq]) {
+                    this.callback[seq]({
+                        m: MessageFrameType.ERROR,
+                        i: seq,
+                        o: 'Request Time out',
+                    })
+                    delete this.callback[seq]
+                }
+            },
+            functionName === 'AuthenticateUser'
+                ? 5000
+                : this.options.requestTimeout,
+        )
         this.seq += 2
         this.ws?.next(messageFrame)
     }
