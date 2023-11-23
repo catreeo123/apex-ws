@@ -25,6 +25,16 @@ const apexWebSocket = new ApexWebSocket({
 const client = await apexWebSocket.getClient(endpoints)
 // OR can pass array directly to making autocomplete of endpoint work
 const client = await apexWebSocket.getClient(['functionName1', 'functionName2'])
+
+// params will be object send with request
+try {
+    const result = await client.functionName1(params)
+} catch (error) {
+    // handle reject promise here for error
+    console.error(error)
+    // rethrow error if need
+    throw error
+}
 ```
 
 ## Options
