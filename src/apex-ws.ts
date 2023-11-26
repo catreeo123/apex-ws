@@ -232,7 +232,7 @@ export class ApexWebSocket {
     private RPCCall(
         functionName: string,
         data: Record<string, any>,
-        callback: Function,
+        callback: (data: MessageFrame) => void,
     ): void {
         if (!this.ws) {
             throw new Error('AP: Websocket is not connected')
