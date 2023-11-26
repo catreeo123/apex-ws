@@ -28,7 +28,10 @@ export const customError = (
     }
     let data: Record<string, any> = {
         message: error.message,
-        stack: error.error?.stack || error.stack || error,
+        error: {
+            message: error.message,
+            stack: error.error?.stack || error.stack || error,
+        },
         status: 'error',
     }
 
