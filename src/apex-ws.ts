@@ -71,6 +71,7 @@ export class ApexWebSocket {
                     data.m === MessageFrameType.EVENT &&
                     data.n === 'LogoutEvent'
                 ) {
+                    customLog(`AP: ${data.n} (${data.i}): ${data.o}.`)
                     this.close()
                     this.createClient()
                 }
