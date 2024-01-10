@@ -71,21 +71,24 @@ export class ApexWebSocket {
                     data.m === MessageFrameType.EVENT &&
                     data.n === 'LogoutEvent'
                 ) {
-                    customLog(`AP: ${data.n} (${data.i}): ${data.o}.`)
+                    customLog(`AP: ${data.n} (${data.i}): Logout event`, data)
                     this.close()
                     this.createClient()
                 }
-
                 // try to re-login if endpoint not found because of unauthorize
                 else if (data.o === 'Endpoint Not Found') {
                     customLog(
                         `AP: ${data.n} (${data.i}): ${data.o}.Try to re-login`,
                     )
                     this.login()
+                } else if (data.m === MessageFrameType.ERROR) {
+                    customLog(`AP: ${data.n} (${data.i}): Error`, data)
                 }
-
                 // return the result to caller function
-                else if (this.callback[data.i]) {
+                else if (
+                    data.m === MessageFrameType.REPLY &&
+                    this.callback[data.i]
+                ) {
                     this.callback[data.i](data)
                     clearTimeout(this.timeout[data.i])
                     delete this.timeout[data.i]
@@ -125,7 +128,7 @@ export class ApexWebSocket {
                           customLog('AP: Received close event')
                           this.close()
                           if (!this.isExit) {
-                              this.createClient()
+                              await this.createClient()
                           }
                       },
             },
