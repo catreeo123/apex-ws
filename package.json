@@ -1,6 +1,6 @@
 {
     "name": "apex-ws",
-    "version": "1.0.12",
+    "version": "1.0.13",
     "description": "Typescript APEX client ",
     "main": "./dist/index.js",
     "module": "./dist/index.mjs",
