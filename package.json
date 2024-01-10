@@ -33,6 +33,6 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/catreeo123/apex-ws"
+        "url": "git+https://github.com/catreeo123/apex-ws.git"
     }
 }
