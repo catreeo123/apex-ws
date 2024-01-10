@@ -20,6 +20,8 @@ export class ApexWebSocket {
     private isExit = false
     private endpoints = [] as readonly string[]
 
+    private keepAliveInterval: NodeJS.Timeout = null
+
     constructor(options: ApexWebSocketOptions) {
         this.options = {
             prettyPrint: false,
@@ -45,6 +47,11 @@ export class ApexWebSocket {
                 this.createTimes,
             )
         }
+
+        if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval)
+            this.keepAliveInterval = null
+        }
         // create websocket connection if not exist
         if (!this.ws || this.ws?.closed) {
             customLog('AP: Creating connection')
@@ -57,6 +64,7 @@ export class ApexWebSocket {
                 if (this.endpoints) {
                     this.addEndpoints(this.endpoints)
                 }
+                this.keepAliveInterval = this.keepAlive()
             } catch (error) {
                 customError(error)
             }
@@ -313,6 +321,15 @@ export class ApexWebSocket {
             })
         }
     }
+    private keepAlive() {
+        return setInterval(async () => {
+            const pong = await this.ping()
+            if (pong.msg !== 'PONG') {
+                this.close()
+                this.createClient()
+            }
+        }, 300000)
+    }
 
     private async authenticateUser(
         username: string,
@@ -322,6 +339,10 @@ export class ApexWebSocket {
         SessionToken: string
     }> {
         return this.RPCPromise('AuthenticateUser', { username, password })
+    }
+
+    private async ping() {
+        return this.RPCPromise('Ping', { omsId: 1 })
     }
     /**
      * For create client and build endpoint from input endpoints for using in the future
