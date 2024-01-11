@@ -223,8 +223,11 @@ export class ApexWebSocket {
 
     private deserializer(value: string): any {
         try {
-            return JSON.parse(value, (_, val) => {
-                if (typeof val === 'string') return this.deserializer(val)
+            return JSON.parse(value, (key, val) => {
+                const regex = /[{[].*[}\]]/g
+                if (typeof val === 'string' && regex.test(val)) {
+                    return this.deserializer(val)
+                }
                 return val
             })
         } catch (exc) {
