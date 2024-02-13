@@ -358,4 +358,8 @@ export class ApexWebSocket {
         this.addEndpoints(endpoints)
         return this.client
     }
+
+    getPendingRequest() {
+        return this.callback
+    }
 }
