@@ -313,8 +313,13 @@ export class ApexWebSocket {
     private buildEndpoint(
         functionName: string,
     ): (params: Record<string, any>) => Promise<any> {
-        return (params: Record<string, any>) =>
-            this.RPCPromise(functionName, params)
+        return async (params: Record<string, any>) => {
+            try {
+                return await this.RPCPromise(functionName, params)
+            } catch (error) {
+                customError(error)
+            }
+        }
     }
 
     private addEndpoints(endpoints: readonly string[]) {
@@ -345,7 +350,11 @@ export class ApexWebSocket {
     }
 
     private async ping() {
-        return this.RPCPromise('Ping', { omsId: 1 })
+        try {
+            return await this.RPCPromise('Ping', { omsId: 1 })
+        } catch (error) {
+            customError(error)
+        }
     }
     /**
      * For create client and build endpoint from input endpoints for using in the future
