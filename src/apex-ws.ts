@@ -1,3 +1,4 @@
+import { catchError, config, of } from 'rxjs'
 import { WebSocketSubject, webSocket } from 'rxjs/webSocket'
 import * as WebSocket from 'ws'
 import {
@@ -6,6 +7,10 @@ import {
     MessageFrameType,
 } from './apex-ws.interface'
 import { customError, customLog, sleep } from './utils'
+
+config.onUnhandledError = (err) => {
+    customError(err)
+}
 
 export class ApexWebSocket {
     private options: ApexWebSocketOptions
@@ -59,7 +64,14 @@ export class ApexWebSocket {
                 this.seq = 0
                 this.isLogin = false
                 this.ws = this.createWebSocket()
-                this.ws.subscribe(this.handleWebSocketReply())
+                this.ws
+                    .pipe(
+                        catchError((err) => {
+                            customError(err)
+                            return of('Error')
+                        }),
+                    )
+                    .subscribe(this.handleWebSocketReply())
                 await this.login()
                 if (this.endpoints) {
                     this.addEndpoints(this.endpoints)
@@ -313,8 +325,13 @@ export class ApexWebSocket {
     private buildEndpoint(
         functionName: string,
     ): (params: Record<string, any>) => Promise<any> {
-        return (params: Record<string, any>) =>
-            this.RPCPromise(functionName, params)
+        return async (params: Record<string, any>) => {
+            try {
+                return await this.RPCPromise(functionName, params)
+            } catch (error) {
+                customError(error)
+            }
+        }
     }
 
     private addEndpoints(endpoints: readonly string[]) {
@@ -345,7 +362,11 @@ export class ApexWebSocket {
     }
 
     private async ping() {
-        return this.RPCPromise('Ping', { omsId: 1 })
+        try {
+            return await this.RPCPromise('Ping', { omsId: 1 })
+        } catch (error) {
+            customError(error)
+        }
     }
     /**
      * For create client and build endpoint from input endpoints for using in the future
