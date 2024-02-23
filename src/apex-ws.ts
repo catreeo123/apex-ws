@@ -187,7 +187,7 @@ export class ApexWebSocket {
             const result = await this.authenticateUser(username, password)
             clearTimeout(loginTimeout)
             this.isLogin = true
-            const maskToken = result.SessionToken.slice(0, -8) + '********'
+            const maskToken = result.SessionToken.slice(0, -12) + '************'
             customLog(`AP ${username}: AuthenticateUser`, {
                 authenticate: result.Authenticated,
                 sessionToken: maskToken,
