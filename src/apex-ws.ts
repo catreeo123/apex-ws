@@ -22,6 +22,7 @@ export class ApexWebSocket {
     private timeout = {}
     private debugMode = false
     private isLogin = false
+    private isLoggingIn = false
     private isExit = false
     private endpoints = [] as readonly string[]
 
@@ -63,6 +64,7 @@ export class ApexWebSocket {
             try {
                 this.seq = 0
                 this.isLogin = false
+                this.isLoggingIn = false
                 this.ws = this.createWebSocket()
                 this.ws
                     .pipe(
@@ -165,33 +167,35 @@ export class ApexWebSocket {
     }
 
     private async login() {
-        if (this.isLogin) {
+        if (this.isLoggingIn) {
             customLog(
                 `AP: A Login Skipped. There is still a pending login request.`,
             )
             return
         }
-        this.isLogin = true
+        this.isLoggingIn = true
         customLog('AP: Pending Login')
         try {
             const { username, password } = this.options.credentials
             // prevent login to stuck and skip forever
             const loginTimeout = setTimeout(() => {
-                if (this.isLogin) {
-                    this.isLogin = false
-                    customError('AP: Login Timeout, set isLogin to false')
+                if (this.isLoggingIn) {
+                    this.isLoggingIn = false
+                    customError('AP: Login Timeout, set isLoggingIn to false')
                 }
             }, 5000)
             const result = await this.authenticateUser(username, password)
             clearTimeout(loginTimeout)
+            this.isLogin = true
+            const maskToken = result.SessionToken.slice(0, -8) + '********'
             customLog(`AP ${username}: AuthenticateUser`, {
                 authenticate: result.Authenticated,
-                sessionToken: result.SessionToken,
+                sessionToken: maskToken,
             })
         } catch (error) {
             customError(error)
         } finally {
-            this.isLogin = false
+            this.isLoggingIn = false
         }
     }
 
@@ -296,7 +300,11 @@ export class ApexWebSocket {
                 : this.options.requestTimeout,
         )
         this.seq += 2
-        this.ws?.next(messageFrame)
+        if (!this.isLogin) {
+            this.login().then(() => this.ws?.next(messageFrame))
+        } else {
+            this.ws?.next(messageFrame)
+        }
     }
 
     private RPCPromise(
