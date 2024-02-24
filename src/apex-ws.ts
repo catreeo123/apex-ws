@@ -300,7 +300,7 @@ export class ApexWebSocket {
                 : this.options.requestTimeout,
         )
         this.seq += 2
-        if (!this.isLogin) {
+        if (!this.isLogin && functionName !== 'AuthenticateUser') {
             this.login().then(() => this.ws?.next(messageFrame))
         } else {
             this.ws?.next(messageFrame)
@@ -351,8 +351,12 @@ export class ApexWebSocket {
     }
     private keepAlive() {
         return setInterval(async () => {
-            const pong = await this.ping()
-            if (pong.msg !== 'PONG') {
+            try {
+                const pong = await this.ping()
+                if (pong?.msg !== 'PONG') {
+                    throw new Error('AP Server not response with PONG')
+                }
+            } catch (error) {
                 this.close()
                 this.createClient()
             }
@@ -370,11 +374,7 @@ export class ApexWebSocket {
     }
 
     private async ping() {
-        try {
-            return await this.RPCPromise('Ping', { omsId: 1 })
-        } catch (error) {
-            customError(error)
-        }
+        return await this.RPCPromise('Ping', { omsId: 1 })
     }
     /**
      * For create client and build endpoint from input endpoints for using in the future
