@@ -95,7 +95,6 @@ export class ApexWebSocket {
                 ) {
                     customLog(`AP: ${data.n} (${data.i}): Logout event`, data)
                     this.close()
-                    this.createClient()
                 }
                 // try to re-login if endpoint not found because of unauthorize
                 else if (data.o === 'Endpoint Not Found') {
@@ -358,7 +357,6 @@ export class ApexWebSocket {
                 }
             } catch (error) {
                 this.close()
-                this.createClient()
             }
         }, 300000)
     }
