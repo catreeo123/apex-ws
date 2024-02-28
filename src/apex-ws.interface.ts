@@ -29,7 +29,7 @@ export interface ApexWebSocketOptions {
     debugMode?: boolean
 
     /**
-     * @default 500
+     * @default 1000
      * Delay before retry to create connection in millisecond
      */
     delayBeforeRetryConnect?: number
