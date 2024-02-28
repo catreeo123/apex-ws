@@ -16,7 +16,6 @@ export class ApexWebSocket {
     private options: ApexWebSocketOptions
     ws: WebSocketSubject<MessageFrame> | undefined
     private client: any = {}
-    private createTimes = 0
     private seq = 0
     private callback = {}
     private timeout = {}
@@ -25,13 +24,16 @@ export class ApexWebSocket {
     private isLoggingIn = false
     private isExit = false
     private endpoints = [] as readonly string[]
+    private retryAttempts = 0
 
     private keepAliveInterval: NodeJS.Timeout = null
 
     constructor(options: ApexWebSocketOptions) {
         this.options = {
             prettyPrint: false,
-            delayBeforeRetryConnect: 500,
+            delayBeforeRetryConnect: 1000,
+            delayTypeBeforeRetryConnect: 'fixed',
+            maxDelayTimeBeforeRetryConnect: 30000,
             requestTimeout: 10000,
             ...options,
         }
@@ -43,25 +45,14 @@ export class ApexWebSocket {
         // so we need to delay before create new connection
         // to avoid multiple connections at the same time
         // and to avoid multiple login requests
-        if (this.seq > 0) {
-            await this.delay(this.options.delayBeforeRetryConnect)
-        }
-        if (this.debugMode) {
-            this.createTimes++
-            customLog(
-                `AP: Create connection: ${this.createTimes}} times`,
-                this.createTimes,
-            )
-        }
-
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval)
-            this.keepAliveInterval = null
-        }
-        // create websocket connection if not exist
-        if (!this.ws || this.ws?.closed) {
-            customLog('AP: Creating connection')
-            try {
+        try {
+            if (this.keepAliveInterval) {
+                clearInterval(this.keepAliveInterval)
+                this.keepAliveInterval = null
+            }
+            // create websocket connection if not exist
+            if (!this.ws || this.ws?.closed) {
+                customLog('AP: Creating connection')
                 this.seq = 0
                 this.isLogin = false
                 this.isLoggingIn = false
@@ -79,9 +70,19 @@ export class ApexWebSocket {
                     this.addEndpoints(this.endpoints)
                 }
                 this.keepAliveInterval = this.keepAlive()
-            } catch (error) {
-                customError(error)
             }
+        } catch (err) {
+            customError(err)
+            let delayTime = this.options.delayBeforeRetryConnect
+            this.retryAttempts++
+            if (this.options.delayTypeBeforeRetryConnect === 'liner') {
+                delayTime = Math.min(
+                    delayTime * this.retryAttempts,
+                    this.options.maxDelayTimeBeforeRetryConnect,
+                )
+            }
+            customLog(`AP: Retry connection: ${this.retryAttempts} times`)
+            await this.delay(delayTime)
         }
     }
 
