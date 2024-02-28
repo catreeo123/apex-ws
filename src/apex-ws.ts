@@ -73,16 +73,6 @@ export class ApexWebSocket {
             }
         } catch (err) {
             customError(err)
-            let delayTime = this.options.delayBeforeRetryConnect
-            this.retryAttempts++
-            if (this.options.delayTypeBeforeRetryConnect === 'liner') {
-                delayTime = Math.min(
-                    delayTime * this.retryAttempts,
-                    this.options.maxDelayTimeBeforeRetryConnect,
-                )
-            }
-            customLog(`AP: Retry connection: ${this.retryAttempts} times`)
-            await this.delay(delayTime)
         }
     }
 
@@ -115,6 +105,10 @@ export class ApexWebSocket {
                     clearTimeout(this.timeout[data.i])
                     delete this.timeout[data.i]
                     delete this.callback[data.i]
+                    // reset retry attempts if can success received message
+                    if (this.retryAttempts > 0) {
+                        this.retryAttempts = 0
+                    }
                 }
             },
             error: (error) => {
@@ -150,6 +144,7 @@ export class ApexWebSocket {
                           customLog('AP: Received close event')
                           this.close()
                           if (!this.isExit) {
+                              await this.delayForCreateNewConnection()
                               await this.createClient()
                           }
                       },
@@ -164,6 +159,19 @@ export class ApexWebSocket {
             },
             WebSocketCtor: (WebSocket as any).WebSocket,
         })
+    }
+
+    private async delayForCreateNewConnection() {
+        let delayTime = this.options.delayBeforeRetryConnect
+        this.retryAttempts++
+        if (this.options.delayTypeBeforeRetryConnect === 'liner') {
+            delayTime = Math.min(
+                delayTime * this.retryAttempts,
+                this.options.maxDelayTimeBeforeRetryConnect,
+            )
+        }
+        customLog(`AP: Retry connection: ${this.retryAttempts} times`)
+        await this.delay(delayTime)
     }
 
     private async login() {
