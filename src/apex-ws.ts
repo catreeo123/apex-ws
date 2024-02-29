@@ -41,10 +41,6 @@ export class ApexWebSocket {
     }
 
     private async createClient() {
-        // if seq > 0, means we are retrying to connect
-        // so we need to delay before create new connection
-        // to avoid multiple connections at the same time
-        // and to avoid multiple login requests
         try {
             if (this.keepAliveInterval) {
                 clearInterval(this.keepAliveInterval)
