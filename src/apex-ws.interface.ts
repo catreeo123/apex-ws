@@ -29,7 +29,7 @@ export interface ApexWebSocketOptions {
     debugMode?: boolean
 
     /**
-     * @default 500
+     * @default 1000
      * Delay before retry to create connection in millisecond
      */
     delayBeforeRetryConnect?: number
@@ -37,12 +37,12 @@ export interface ApexWebSocketOptions {
      * @default 'fixed'
      * Delay scale up per attempts for linear type
      */
-    delayTypeBeforeRetryConnect: 'fixed' | 'liner'
+    delayTypeBeforeRetryConnect?: 'fixed' | 'liner'
     /**
      * @default 30000
      * Max delay in millisecond
      */
-    maxDelayTimeBeforeRetryConnect: number
+    maxDelayTimeBeforeRetryConnect?: number
     /**
      * @default false
      * Add 2 space of JSON stringify to print debugMode log
