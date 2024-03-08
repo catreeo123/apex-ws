@@ -167,7 +167,9 @@ export class ApexWebSocket {
             )
         }
         customLog(`AP: Retry connection: ${this.retryAttempts} times`)
-        await this.delay(delayTime)
+        // To make it not login at the same time and cause loop logout login min 1 sec and max 5 sec
+        const randomDelay = Math.floor(Math.random() * 4000) + 1000
+        await this.delay(delayTime + randomDelay)
     }
 
     private async login() {
