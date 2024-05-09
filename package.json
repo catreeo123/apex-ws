@@ -28,6 +28,8 @@
         "typescript": "^5.2.2"
     },
     "dependencies": {
+        "@types/opossum": "^8.1.7",
+        "opossum": "^8.1.4",
         "rxjs": "^7.8.1",
         "ws": "^8.14.2"
     },

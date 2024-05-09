@@ -1,3 +1,4 @@
+import * as CircuitBreaker from 'opossum'
 import { catchError, config, of } from 'rxjs'
 import { WebSocketSubject, webSocket } from 'rxjs/webSocket'
 import * as WebSocket from 'ws'
@@ -10,6 +11,12 @@ import { customError, customLog, sleep } from './utils'
 
 config.onUnhandledError = (err) => {
     customError(err)
+}
+
+const defaultCircuitBreakerOption: CircuitBreaker.Options = {
+    timeout: 10000,
+    errorThresholdPercentage: 99,
+    resetTimeout: 5000,
 }
 
 export class ApexWebSocket {
@@ -296,7 +303,7 @@ export class ApexWebSocket {
                     this.callback[seq]({
                         m: MessageFrameType.ERROR,
                         i: seq,
-                        o: 'Request Time out',
+                        o: { result: false, errormsg: 'Request Time out' },
                     })
                     delete this.callback[seq]
                 }
@@ -313,27 +320,57 @@ export class ApexWebSocket {
         }
     }
 
-    private RPCPromise(
+    private checkResult({ o: data }: Pick<MessageFrame, 'o'>): boolean {
+        if (typeof data === 'string') {
+            return true
+        }
+        if ('result' in data) {
+            return data.result as boolean
+        } else {
+            return true
+        }
+    }
+
+    private async RPCPromise(
         functionName: string,
         params: Record<string, any>,
     ): Promise<any> {
         return new Promise((resolve, reject) => {
             this.RPCCall(functionName, params, (data: MessageFrame) => {
-                if (data.m !== MessageFrameType.REPLY) {
-                    reject(
-                        new Error(
-                            `AP ${functionName} ${
-                                data.i
-                            } error message: ${this.prettyJSONStringify(
-                                data.o,
-                            )}`,
-                        ),
-                    )
-                } else {
-                    resolve(data.o)
-                }
+                this.RPCCallBack(functionName, data, resolve, reject)
             })
         })
+    }
+
+    breaker = new CircuitBreaker(
+        this.RPCPromise.bind(this),
+        defaultCircuitBreakerOption,
+    )
+    private async RPCPromiseCircuitBreaker(
+        functionName: string,
+        params: Record<string, any>,
+    ) {
+        console.log(this.breaker.stats)
+        return await this.breaker.fire(functionName, params)
+    }
+
+    private async RPCCallBack(
+        functionName: string,
+        data: MessageFrame,
+        resolve,
+        reject,
+    ) {
+        if (data.m !== MessageFrameType.REPLY || !this.checkResult(data)) {
+            reject(
+                new Error(
+                    `AP ${functionName} ${
+                        data.i
+                    } error message: ${this.prettyJSONStringify(data.o)}`,
+                ),
+            )
+        } else {
+            resolve(data.o)
+        }
     }
 
     private buildEndpoint(
@@ -341,7 +378,7 @@ export class ApexWebSocket {
     ): (params: Record<string, any>) => Promise<any> {
         return async (params: Record<string, any>) => {
             try {
-                return await this.RPCPromise(functionName, params)
+                return await this.RPCPromiseCircuitBreaker(functionName, params)
             } catch (error) {
                 customError(error)
             }
