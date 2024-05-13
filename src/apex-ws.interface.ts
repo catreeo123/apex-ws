@@ -57,7 +57,7 @@ export interface ApexWebSocketOptions {
     requestTimeout?: number
 
     /**
-     * Custom logger like winston
+     * Custom logger like nestjs-winston
      * my log input will be ({message, metadata}) and ({message, error, metadata})
      */
     logger?: {
