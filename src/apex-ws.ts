@@ -303,7 +303,7 @@ export class ApexWebSocket {
                     this.callback[seq]({
                         m: MessageFrameType.ERROR,
                         i: seq,
-                        o: { result: false, errormsg: 'Request Time out' },
+                        o: 'Request Time out',
                     })
                     delete this.callback[seq]
                 }
@@ -342,7 +342,7 @@ export class ApexWebSocket {
         })
     }
 
-    breaker = new CircuitBreaker(
+    RPCPromiseBreaker = new CircuitBreaker(
         this.RPCPromise.bind(this),
         defaultCircuitBreakerOption,
     )
@@ -350,8 +350,8 @@ export class ApexWebSocket {
         functionName: string,
         params: Record<string, any>,
     ) {
-        console.log(this.breaker.stats)
-        return await this.breaker.fire(functionName, params)
+        console.log(this.RPCPromiseBreaker.stats)
+        return await this.RPCPromiseBreaker.fire(functionName, params)
     }
 
     private async RPCCallBack(
