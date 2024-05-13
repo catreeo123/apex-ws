@@ -46,6 +46,7 @@ export interface ApexWebSocketOptions {
     /**
      * @default false
      * Add 2 space of JSON stringify to print debugMode log
+     * now have problem with JSON.string in my custom log so didn't need this for a while
      */
     prettyPrint?: boolean
 
@@ -54,6 +55,16 @@ export interface ApexWebSocketOptions {
      * Request timeout in millisecond
      */
     requestTimeout?: number
+
+    /**
+     * Custom logger like winston
+     * my log input will be ({message, metadata}) and ({message, error, metadata})
+     */
+    logger?: {
+        log: (...args: any[]) => any
+        error: (...args: any[]) => any
+        debug: (...args: any[]) => any
+    }
 }
 
 export const enum MessageFrameType {
