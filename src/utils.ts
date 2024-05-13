@@ -2,7 +2,13 @@ export const sleep = async (time: number) => {
     return new Promise((resolve) => setTimeout(resolve, time))
 }
 
-export const customLog = (message: string, metadata?: any) => {
+export const customLog = ({
+    message,
+    metadata,
+}: {
+    message: string
+    metadata?: Record<string, any>
+}) => {
     if (metadata) {
         console.log(JSON.stringify({ message, metadata }))
     } else {
@@ -10,7 +16,13 @@ export const customLog = (message: string, metadata?: any) => {
     }
 }
 
-export const customDebug = (message: string, metadata?: any) => {
+export const customDebug = ({
+    message,
+    metadata,
+}: {
+    message: string
+    metadata?: Record<string, any>
+}) => {
     if (metadata) {
         console.debug(JSON.stringify({ message, status: 'debug', metadata }))
     } else {
@@ -18,16 +30,21 @@ export const customDebug = (message: string, metadata?: any) => {
     }
 }
 
-export const customError = (
-    error: string | Record<string, any>,
-    metadata?: any,
-) => {
-    if (typeof error === 'string') {
-        console.error(JSON.stringify({ message: error, status: 'error' }))
+export const customError = ({
+    message,
+    error,
+    metadata,
+}: {
+    message: string
+    error?: Record<string, any>
+    metadata?: Record<string, any>
+}) => {
+    if (!error) {
+        console.error(JSON.stringify({ message, status: 'error' }))
         return
     }
     let data: Record<string, any> = {
-        message: error.message,
+        message: message,
         error: {
             message: error.message,
             stack: error.error?.stack || error.stack || error,

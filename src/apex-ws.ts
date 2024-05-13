@@ -6,11 +6,7 @@ import {
     MessageFrame,
     MessageFrameType,
 } from './apex-ws.interface'
-import { customError, customLog, sleep } from './utils'
-
-config.onUnhandledError = (err) => {
-    customError(err)
-}
+import { customDebug, customError, customLog, sleep } from './utils'
 
 export class ApexWebSocket {
     private options: ApexWebSocketOptions
@@ -28,6 +24,12 @@ export class ApexWebSocket {
 
     private keepAliveInterval: NodeJS.Timeout = null
 
+    private logger: ApexWebSocketOptions['logger'] = {
+        log: customLog,
+        error: customError,
+        debug: customDebug,
+    }
+
     constructor(options: ApexWebSocketOptions) {
         this.options = {
             prettyPrint: false,
@@ -38,6 +40,15 @@ export class ApexWebSocket {
             ...options,
         }
         this.debugMode = !!options.debugMode
+        if (options.logger) {
+            this.logger = options.logger
+        }
+        config.onUnhandledError = (err) => {
+            this.logger.error({
+                message: 'unhandled error of rxjs',
+                error: err,
+            })
+        }
     }
 
     private async createClient() {
@@ -48,7 +59,7 @@ export class ApexWebSocket {
             }
             // create websocket connection if not exist
             if (!this.ws || this.ws?.closed) {
-                customLog('AP: Creating connection')
+                this.logger.log({ message: 'AP: Creating connection' })
                 this.seq = 0
                 this.isLogin = false
                 this.isLoggingIn = false
@@ -56,7 +67,10 @@ export class ApexWebSocket {
                 this.ws
                     .pipe(
                         catchError((err) => {
-                            customError(err)
+                            this.logger.error({
+                                message: 'ws pipe error',
+                                error: err,
+                            })
                             return of('Error')
                         }),
                     )
@@ -68,7 +82,7 @@ export class ApexWebSocket {
                 this.keepAliveInterval = this.keepAlive()
             }
         } catch (err) {
-            customError(err)
+            this.logger.error({ message: 'AP: createClient error', error: err })
         }
     }
 
@@ -80,17 +94,25 @@ export class ApexWebSocket {
                     data.m === MessageFrameType.EVENT &&
                     data.n === 'LogoutEvent'
                 ) {
-                    customLog(`AP: ${data.n} (${data.i}): Logout event`, data)
+                    this.logger.log({
+                        message: `AP: ${data.n} (${data.i}): Logout event`,
+                        metadata: {
+                            data,
+                        },
+                    })
                     this.close()
                 }
                 // try to re-login if endpoint not found because of unauthorize
                 else if (data.o === 'Endpoint Not Found') {
-                    customLog(
-                        `AP: ${data.n} (${data.i}): ${data.o}.Try to re-login`,
-                    )
+                    this.logger.log({
+                        message: `AP: ${data.n} (${data.i}): ${data.o}.Try to re-login`,
+                    })
                     this.login()
                 } else if (data.m === MessageFrameType.ERROR) {
-                    customLog(`AP: ${data.n} (${data.i}): Error`, data)
+                    this.logger.log({
+                        message: `AP: ${data.n} (${data.i}): Error`,
+                        metadata: { data },
+                    })
                 }
                 // return the result to caller function
                 else if (
@@ -108,10 +130,15 @@ export class ApexWebSocket {
                 }
             },
             error: (error) => {
-                customError(error)
+                this.logger.error({
+                    message: `AP: handleWebSocketReply error: ${error.message}}`,
+                    error,
+                })
             },
             complete: () => {
-                customLog('AP: Websocket connection is closed')
+                this.logger.log({
+                    message: 'AP: Websocket connection is closed',
+                })
             },
         }
     }
@@ -124,12 +151,17 @@ export class ApexWebSocket {
                     ? this.options.onOpen
                     : () => {
                           const { username } = this.options.credentials
-                          customLog(`AP ${username}: Connection established`)
+                          this.logger.log({
+                              message: `AP ${username}: Connection established`,
+                          })
                       },
             },
             closingObserver: {
                 next: () => {
-                    customLog('AP: Received complete event by close function')
+                    this.logger.log({
+                        message:
+                            'AP: Received complete event by close function',
+                    })
                 },
             },
             // retry to create new connection when received close event
@@ -137,7 +169,9 @@ export class ApexWebSocket {
                 next: this.options.onClose
                     ? this.options.onClose
                     : async () => {
-                          customLog('AP: Received close event')
+                          this.logger.log({
+                              message: 'AP: Received close event',
+                          })
                           this.close()
                           if (!this.isExit) {
                               await this.delayForCreateNewConnection()
@@ -166,7 +200,9 @@ export class ApexWebSocket {
                 this.options.maxDelayTimeBeforeRetryConnect,
             )
         }
-        customLog(`AP: Retry connection: ${this.retryAttempts} times`)
+        this.logger.log({
+            message: `AP: Retry connection: ${this.retryAttempts} times`,
+        })
         // To make it not login at the same time and cause loop logout login min 1 sec and max 5 sec
         const randomDelay = Math.floor(Math.random() * 4000) + 1000
         await this.delay(delayTime + randomDelay)
@@ -174,32 +210,41 @@ export class ApexWebSocket {
 
     private async login() {
         if (this.isLoggingIn) {
-            customLog(
-                `AP: A Login Skipped. There is still a pending login request.`,
-            )
+            this.logger.log({
+                message: `AP: A Login Skipped. There is still a pending login request.`,
+            })
             return
         }
         this.isLoggingIn = true
-        customLog('AP: Pending Login')
+        this.logger.log({ message: 'AP: Pending Login' })
         try {
             const { username, password } = this.options.credentials
             // prevent login to stuck and skip forever
             const loginTimeout = setTimeout(() => {
                 if (this.isLoggingIn) {
                     this.isLoggingIn = false
-                    customError('AP: Login Timeout, set isLoggingIn to false')
+                    this.logger.error({
+                        message: 'AP: Login Timeout, set isLoggingIn to false',
+                    })
                 }
             }, 5000)
             const result = await this.authenticateUser(username, password)
             clearTimeout(loginTimeout)
             this.isLogin = true
-            const maskToken = result.SessionToken.slice(0, -12) + '************'
-            customLog(`AP ${username}: AuthenticateUser`, {
-                authenticate: result.Authenticated,
-                sessionToken: maskToken,
+            const maskToken =
+                result.SessionToken?.slice(0, -12) + '************'
+            this.logger.log({
+                message: `AP ${username}: AuthenticateUser`,
+                metadata: {
+                    authenticate: result.Authenticated,
+                    sessionToken: maskToken,
+                },
             })
         } catch (error) {
-            customError(error)
+            this.logger.error({
+                message: `AP: login error: ${error.message}`,
+                error,
+            })
         } finally {
             this.isLoggingIn = false
         }
@@ -210,7 +255,7 @@ export class ApexWebSocket {
      */
     close() {
         if (this.ws) {
-            customLog('AP: Connection is closing')
+            this.logger.log({ message: 'AP: Connection is closing' })
             this.ws.complete()
             this.ws = undefined
         }
@@ -259,9 +304,6 @@ export class ApexWebSocket {
 
     private prettyJSONStringify(data: Record<string, any> | string) {
         if (typeof data === 'string') return data
-        if ('password' in data) {
-            delete data.password
-        }
         const space = this.options.prettyPrint ? 2 : 0
         return JSON.stringify(data, null, space)
     }
@@ -281,20 +323,13 @@ export class ApexWebSocket {
             n: functionName,
             o: data,
         }
-        if (this.debugMode) {
-            customLog(
-                `AP: ${functionName} (${seq}): ${this.prettyJSONStringify(
-                    data,
-                )}`,
-                data,
-            )
-        }
         this.callback[seq] = callback
         this.timeout[seq] = setTimeout(
             () => {
                 if (this.callback[seq]) {
                     this.callback[seq]({
                         m: MessageFrameType.ERROR,
+                        n: functionName,
                         i: seq,
                         o: 'Request Time out',
                     })
@@ -310,6 +345,18 @@ export class ApexWebSocket {
             this.login().then(() => this.ws?.next(messageFrame))
         } else {
             this.ws?.next(messageFrame)
+        }
+        if (this.debugMode) {
+            const dataToLog = { ...data }
+            if ('password' in dataToLog) {
+                delete dataToLog.password
+            }
+            this.logger.debug({
+                message: `AP: ${functionName} (${seq}): ${this.prettyJSONStringify(
+                    dataToLog,
+                )}`,
+                metadata: dataToLog,
+            })
         }
     }
 
@@ -349,7 +396,10 @@ export class ApexWebSocket {
             try {
                 return await this.RPCPromise(functionName, params)
             } catch (error) {
-                customError(error)
+                this.logger.error({
+                    message: error.message,
+                    error,
+                })
                 if (options.forceThrowError) {
                     throw error
                 }
@@ -395,7 +445,15 @@ export class ApexWebSocket {
      */
     async getClient<const T extends string[]>(
         endpoints: readonly [...T],
-    ): Promise<Record<T[number], (params: any) => Promise<any>>> {
+    ): Promise<
+        Record<
+            T[number],
+            (
+                params: any,
+                options?: { forceThrowError: boolean },
+            ) => Promise<any>
+        >
+    > {
         await this.createClient()
         this.endpoints = endpoints
         this.addEndpoints(endpoints)
