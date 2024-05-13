@@ -338,12 +338,21 @@ export class ApexWebSocket {
 
     private buildEndpoint(
         functionName: string,
-    ): (params: Record<string, any>) => Promise<any> {
-        return async (params: Record<string, any>) => {
+    ): (
+        params: Record<string, any>,
+        options?: { forceThrowError: boolean },
+    ) => Promise<any> {
+        return async (
+            params: Record<string, any>,
+            options = { forceThrowError: false },
+        ) => {
             try {
                 return await this.RPCPromise(functionName, params)
             } catch (error) {
                 customError(error)
+                if (options.forceThrowError) {
+                    throw error
+                }
             }
         }
     }
