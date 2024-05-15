@@ -383,28 +383,45 @@ export class ApexWebSocket {
         })
     }
 
-    private buildEndpoint(
-        functionName: string,
-    ): (
+    private buildEndpoint(functionName: string): (
         params: Record<string, any>,
-        options?: { forceThrowError: boolean },
+        options?: {
+            forceThrowError: boolean
+            maxRetry: number
+            retryCount: number
+        },
     ) => Promise<any> {
-        return async (
+        const endpoint = async (
             params: Record<string, any>,
-            options = { forceThrowError: false },
+            options = { forceThrowError: false, maxRetry: 0, retryCount: 1 },
         ) => {
+            const currRetry =
+                typeof options.retryCount === 'number' ? options.retryCount : 1
             try {
                 return await this.RPCPromise(functionName, params)
             } catch (error) {
                 this.logger.error({
-                    message: error.message,
+                    message: `AP ${functionName} ${currRetry} failed.`,
                     error,
                 })
-                if (options.forceThrowError) {
-                    throw error
+                if (currRetry > options.maxRetry) {
+                    this.logger.error({
+                        message: error.message,
+                        error,
+                    })
+                    if (options.forceThrowError) {
+                        throw error
+                    }
+                } else {
+                    return endpoint(params, {
+                        forceThrowError: options.forceThrowError,
+                        maxRetry: options.maxRetry,
+                        retryCount: options.retryCount + 1,
+                    })
                 }
             }
         }
+        return endpoint
     }
 
     private addEndpoints(endpoints: readonly string[]) {
