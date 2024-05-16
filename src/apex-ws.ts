@@ -8,7 +8,13 @@ import {
     MessageFrame,
     MessageFrameType,
 } from './apex-ws.interface'
-import { customDebug, customError, customLog, sleep } from './utils'
+import {
+    convertErrorToJSON,
+    customDebug,
+    customError,
+    customLog,
+    sleep,
+} from './utils'
 
 export class ApexWebSocket {
     private options: ApexWebSocketOptions
@@ -48,7 +54,11 @@ export class ApexWebSocket {
         config.onUnhandledError = (err) => {
             this.logger.error({
                 message: 'unhandled error of rxjs',
-                error: err,
+                error: {
+                    message: err.message,
+                    stack: err.stack,
+                    kind: err.name,
+                },
             })
         }
     }
@@ -71,7 +81,7 @@ export class ApexWebSocket {
                         catchError((err) => {
                             this.logger.error({
                                 message: 'ws pipe error',
-                                error: err,
+                                err,
                             })
                             return of('Error')
                         }),
@@ -84,7 +94,14 @@ export class ApexWebSocket {
                 this.keepAliveInterval = this.keepAlive()
             }
         } catch (err) {
-            this.logger.error({ message: 'AP: createClient error', error: err })
+            this.logger.error({
+                message: 'AP: createClient error',
+                error: {
+                    message: err.message,
+                    stack: err.stack,
+                    kind: err.name,
+                },
+            })
         }
     }
 
@@ -134,7 +151,11 @@ export class ApexWebSocket {
             error: (error) => {
                 this.logger.error({
                     message: `AP: handleWebSocketReply error: ${error.message}}`,
-                    error,
+                    error: {
+                        message: error.message,
+                        stack: error.stack,
+                        kind: error.name,
+                    },
                 })
             },
             complete: () => {
@@ -245,7 +266,11 @@ export class ApexWebSocket {
         } catch (error) {
             this.logger.error({
                 message: `AP: login error: ${error.message}`,
-                error,
+                error: {
+                    message: error.message,
+                    stack: error.stack,
+                    kind: error.name,
+                },
             })
         } finally {
             this.isLoggingIn = false
@@ -444,13 +469,13 @@ export class ApexWebSocket {
             } catch (error) {
                 this.logger.error({
                     message: `AP ${functionName} retry ${currRetry} failed.`,
-                    error,
+                    error: convertErrorToJSON(error),
                     metadata: { params },
                 })
                 if (currRetry > maxRetry) {
                     this.logger.error({
                         message: error.message,
-                        error,
+                        error: convertErrorToJSON(error),
                         metadata: { params },
                     })
                     if (forceThrowError) {

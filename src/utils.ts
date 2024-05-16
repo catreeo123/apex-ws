@@ -60,3 +60,19 @@ export const customError = ({
     }
     console.error(JSON.stringify(data))
 }
+
+export const convertErrorToJSON = (error: unknown) => {
+    if (!(error instanceof Error)) {
+        return
+    }
+    let cause
+    if ('cause' in error) {
+        cause = convertErrorToJSON(error.cause)
+    }
+    return {
+        message: error.message,
+        stack: error.stack,
+        kind: error.name,
+        cause,
+    }
+}
