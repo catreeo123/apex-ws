@@ -363,7 +363,6 @@ export class ApexWebSocket {
     }
 
     private checkResult({ o: data }: Pick<MessageFrame, 'o'>): boolean {
-        console.log(data)
         if (typeof data === 'string') {
             return true
         }
@@ -480,12 +479,10 @@ export class ApexWebSocket {
         return setInterval(async () => {
             try {
                 const pong = await this.ping()
-                console.log('🚀 ~ returnsetInterval ~ pong:', pong)
                 if (pong?.msg !== 'PONG') {
                     throw new Error('AP Server not response with PONG')
                 }
             } catch (error) {
-                console.log('🚀 ~ returnsetInterval ~ error:', error)
                 this.close()
             }
         }, 300000)
