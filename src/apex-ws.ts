@@ -488,7 +488,7 @@ export class ApexWebSocket {
                 console.log('🚀 ~ returnsetInterval ~ error:', error)
                 this.close()
             }
-        }, 1000)
+        }, 300000)
     }
 
     private async authenticateUser(
