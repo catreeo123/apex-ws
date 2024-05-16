@@ -48,6 +48,9 @@ export const customError = ({
         error: {
             message: error.message,
             stack: error.error?.stack || error.stack || error,
+            cause: error.cause
+                ? { message: error.cause.message, stack: error.cause.stack }
+                : undefined,
         },
         status: 'error',
     }
