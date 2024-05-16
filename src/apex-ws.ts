@@ -4,16 +4,11 @@ import { WebSocketSubject, webSocket } from 'rxjs/webSocket'
 import * as WebSocket from 'ws'
 import {
     ApexWebSocketOptions,
+    EndpointOptions,
     MessageFrame,
     MessageFrameType,
 } from './apex-ws.interface'
 import { customDebug, customError, customLog, sleep } from './utils'
-
-const defaultCircuitBreakerOption: CircuitBreaker.Options = {
-    timeout: 10000,
-    errorThresholdPercentage: 99,
-    resetTimeout: 5000,
-}
 
 export class ApexWebSocket {
     private options: ApexWebSocketOptions
@@ -389,18 +384,6 @@ export class ApexWebSocket {
         })
     }
 
-    RPCPromiseBreaker = new CircuitBreaker(
-        this.RPCPromise.bind(this),
-        defaultCircuitBreakerOption,
-    )
-    private async RPCPromiseCircuitBreaker(
-        functionName: string,
-        params: Record<string, any>,
-    ) {
-        console.log(this.RPCPromiseBreaker.stats)
-        return await this.RPCPromiseBreaker.fire(functionName, params)
-    }
-
     private async RPCCallBack(
         functionName: string,
         data: MessageFrame,
@@ -420,40 +403,64 @@ export class ApexWebSocket {
         }
     }
 
-    private buildEndpoint(functionName: string): (
+    private buildEndpoint(
+        functionName: string,
+    ): (
         params: Record<string, any>,
-        options?: {
-            forceThrowError: boolean
-            maxRetry: number
-            retryCount: number
-        },
+        options?: EndpointOptions,
     ) => Promise<any> {
+        const RPCPromiseBreaker = new CircuitBreaker(
+            this.RPCPromise.bind(this),
+            {
+                ...this.options.circuitBreaker,
+                timeout: this.options.requestTimeout + 1000,
+            },
+        )
+        RPCPromiseBreaker.fallback((functionName, params, error?) => {
+            if (error?.message === 'Breaker is open') {
+                throw new Error(`${functionName} not available right now`, {
+                    cause: error,
+                })
+            }
+            throw error
+        })
+        const RPCPromiseCircuitBreaker = async (
+            functionName: string,
+            params: Record<string, any>,
+        ) => {
+            return await RPCPromiseBreaker.fire(functionName, params)
+        }
         const endpoint = async (
             params: Record<string, any>,
-            options = { forceThrowError: false, maxRetry: 0, retryCount: 1 },
+            {
+                forceThrowError = false,
+                maxRetry = 0,
+                retryCount = 1,
+            }: EndpointOptions & { retryCount?: number } = {},
         ) => {
-            const currRetry =
-                typeof options.retryCount === 'number' ? options.retryCount : 1
+            const currRetry = typeof retryCount === 'number' ? retryCount : 1
             try {
-                return await this.RPCPromiseCircuitBreaker(functionName, params)
+                return await RPCPromiseCircuitBreaker(functionName, params)
             } catch (error) {
                 this.logger.error({
-                    message: `AP ${functionName} ${currRetry} failed.`,
+                    message: `AP ${functionName} retry ${currRetry} failed.`,
                     error,
+                    metadata: { params },
                 })
-                if (currRetry > options.maxRetry) {
+                if (currRetry > maxRetry) {
                     this.logger.error({
                         message: error.message,
                         error,
+                        metadata: { params },
                     })
-                    if (options.forceThrowError) {
+                    if (forceThrowError) {
                         throw error
                     }
                 } else {
                     return endpoint(params, {
-                        forceThrowError: options.forceThrowError,
-                        maxRetry: options.maxRetry,
-                        retryCount: options.retryCount + 1,
+                        forceThrowError: forceThrowError,
+                        maxRetry: maxRetry,
+                        retryCount: retryCount + 1,
                     })
                 }
             }
@@ -502,10 +509,7 @@ export class ApexWebSocket {
     ): Promise<
         Record<
             T[number],
-            (
-                params: any,
-                options?: { forceThrowError: boolean },
-            ) => Promise<any>
+            (params: any, options?: EndpointOptions) => Promise<any>
         >
     > {
         await this.createClient()

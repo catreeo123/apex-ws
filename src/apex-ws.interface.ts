@@ -1,3 +1,4 @@
+import * as CircuitBreaker from 'opossum'
 export interface ApexWebSocketOptions {
     /**
      * AP websocket server url
@@ -65,6 +66,10 @@ export interface ApexWebSocketOptions {
         error: (...args: any[]) => any
         debug: (...args: any[]) => any
     }
+
+    // opposum circuit breaker option https://nodeshift.dev/opossum/#circuitbreaker
+    // global circuit breaker options setting for each endpoint.
+    circuitBreaker?: CircuitBreaker.Options
 }
 
 export const enum MessageFrameType {
@@ -84,6 +89,11 @@ export interface MessageFrame {
     i: number
     n: string
     o: Record<string, any> | string
+}
+
+export interface EndpointOptions {
+    forceThrowError?: boolean
+    maxRetry?: number
 }
 
 // e.g. APClient<typeof endpoints> from const endpoints = string[] as const
