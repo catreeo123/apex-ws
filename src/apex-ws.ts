@@ -1,4 +1,4 @@
-import * as CircuitBreaker from 'opossum'
+import * as CircuitBreakerType from 'opossum'
 import { catchError, config, of } from 'rxjs'
 import { WebSocketSubject, webSocket } from 'rxjs/webSocket'
 import * as WebSocket from 'ws'
@@ -15,6 +15,7 @@ import {
     customLog,
     sleep,
 } from './utils'
+const CircuitBreaker = require('opossum')
 
 export class ApexWebSocket {
     private options: ApexWebSocketOptions
@@ -435,7 +436,7 @@ export class ApexWebSocket {
 
     buildEndpoint(
         functionName: string,
-        circuitBreakerOptions?: CircuitBreaker.Options,
+        circuitBreakerOptions?: CircuitBreakerType.Options,
     ): (
         params: Record<string, any>,
         options?: EndpointOptions,

@@ -1,4 +1,4 @@
-import * as CircuitBreaker from 'opossum'
+import * as CircuitBreakerType from 'opossum'
 export interface ApexWebSocketOptions {
     /**
      * AP websocket server url
@@ -69,7 +69,7 @@ export interface ApexWebSocketOptions {
 
     // opposum circuit breaker option https://nodeshift.dev/opossum/#circuitbreaker
     // global circuit breaker options setting for each endpoint.
-    circuitBreaker?: Omit<CircuitBreaker.Options, 'timeout'>
+    circuitBreaker?: Omit<CircuitBreakerType.Options, 'timeout'>
 }
 
 export const enum MessageFrameType {
