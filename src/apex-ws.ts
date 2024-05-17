@@ -339,6 +339,7 @@ export class ApexWebSocket {
         functionName: string,
         data: Record<string, any>,
         callback: (data: MessageFrame) => void,
+        timeoutMs?: number,
     ): void {
         if (!this.ws) {
             throw new Error('AP: Websocket is not connected')
@@ -363,9 +364,7 @@ export class ApexWebSocket {
                     delete this.callback[seq]
                 }
             },
-            ['AuthenticateUser', 'Ping'].includes(functionName)
-                ? 5000
-                : this.options.requestTimeout,
+            timeoutMs > 0 ? timeoutMs : this.options.requestTimeout,
         )
         this.seq += 2
         if (!this.isLogin && functionName !== 'AuthenticateUser') {
@@ -401,11 +400,17 @@ export class ApexWebSocket {
     private async RPCPromise(
         functionName: string,
         params: Record<string, any>,
+        timeoutMs?: number,
     ): Promise<any> {
         return new Promise((resolve, reject) => {
-            this.RPCCall(functionName, params, (data: MessageFrame) => {
-                this.RPCCallBack(functionName, data, resolve, reject)
-            })
+            this.RPCCall(
+                functionName,
+                params,
+                (data: MessageFrame) => {
+                    this.RPCCallBack(functionName, data, resolve, reject)
+                },
+                timeoutMs,
+            )
         })
     }
 
@@ -428,8 +433,9 @@ export class ApexWebSocket {
         }
     }
 
-    private buildEndpoint(
+    buildEndpoint(
         functionName: string,
+        circuitBreakerOptions?: CircuitBreaker.Options,
     ): (
         params: Record<string, any>,
         options?: EndpointOptions,
@@ -438,10 +444,11 @@ export class ApexWebSocket {
             this.RPCPromise.bind(this),
             {
                 ...this.options.circuitBreaker,
-                timeout: this.options.requestTimeout + 1000,
+                ...circuitBreakerOptions,
+                timeout: false,
             },
         )
-        RPCPromiseBreaker.fallback((functionName, params, error?) => {
+        RPCPromiseBreaker.fallback((functionName, params, timeout, error?) => {
             if (error?.message === 'Breaker is open') {
                 throw new Error(`${functionName} not available right now`, {
                     cause: error,
@@ -449,23 +456,23 @@ export class ApexWebSocket {
             }
             throw error
         })
-        const RPCPromiseCircuitBreaker = async (
-            functionName: string,
-            params: Record<string, any>,
-        ) => {
-            return await RPCPromiseBreaker.fire(functionName, params)
-        }
+
         const endpoint = async (
             params: Record<string, any>,
             {
                 forceThrowError = false,
                 maxRetry = 0,
                 retryCount = 1,
+                timeoutMs,
             }: EndpointOptions & { retryCount?: number } = {},
         ) => {
             const currRetry = typeof retryCount === 'number' ? retryCount : 1
             try {
-                return await RPCPromiseCircuitBreaker(functionName, params)
+                return await RPCPromiseBreaker.fire(
+                    functionName,
+                    params,
+                    timeoutMs,
+                )
             } catch (error) {
                 this.logger.error({
                     message: `AP ${functionName} retry ${currRetry} failed.`,
@@ -486,6 +493,7 @@ export class ApexWebSocket {
                         forceThrowError: forceThrowError,
                         maxRetry: maxRetry,
                         retryCount: retryCount + 1,
+                        timeoutMs,
                     })
                 }
             }
@@ -520,11 +528,15 @@ export class ApexWebSocket {
         Authenticated: boolean
         SessionToken: string
     }> {
-        return this.RPCPromise('AuthenticateUser', { username, password })
+        return this.RPCPromise(
+            'AuthenticateUser',
+            { username, password },
+            10000,
+        )
     }
 
     private async ping() {
-        return await this.RPCPromise('Ping', { omsId: 1 })
+        return await this.RPCPromise('Ping', { omsId: 1 }, 10000)
     }
     /**
      * For create client and build endpoint from input endpoints for using in the future

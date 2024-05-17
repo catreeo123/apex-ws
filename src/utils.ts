@@ -63,7 +63,7 @@ export const customError = ({
 
 export const convertErrorToJSON = (error: unknown) => {
     if (!(error instanceof Error)) {
-        return
+        return error
     }
     let cause
     if ('cause' in error) {

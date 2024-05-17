@@ -69,7 +69,7 @@ export interface ApexWebSocketOptions {
 
     // opposum circuit breaker option https://nodeshift.dev/opossum/#circuitbreaker
     // global circuit breaker options setting for each endpoint.
-    circuitBreaker?: CircuitBreaker.Options
+    circuitBreaker?: Omit<CircuitBreaker.Options, 'timeout'>
 }
 
 export const enum MessageFrameType {
@@ -94,6 +94,7 @@ export interface MessageFrame {
 export interface EndpointOptions {
     forceThrowError?: boolean
     maxRetry?: number
+    timeoutMs?: number
 }
 
 // e.g. APClient<typeof endpoints> from const endpoints = string[] as const
