@@ -67,8 +67,9 @@ export interface ApexWebSocketOptions {
         debug: (...args: any[]) => any
     }
 
-    // opposum circuit breaker option https://nodeshift.dev/opossum/#circuitbreaker
-    // global circuit breaker options setting for each endpoint.
+    /** opposum circuit breaker option https://nodeshift.dev/opossum/#circuitbreaker
+     * global circuit breaker options setting for each endpoint.
+     */
     circuitBreaker?: Omit<CircuitBreakerType.Options, 'timeout'>
 }
 
