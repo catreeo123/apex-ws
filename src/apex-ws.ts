@@ -81,7 +81,11 @@ export class ApexWebSocket {
                         catchError((err) => {
                             this.logger.error({
                                 message: 'ws pipe error',
-                                err,
+                                error: {
+                                    message: err.message,
+                                    stack: err.stack,
+                                    kind: err.name,
+                                },
                             })
                             return of('Error')
                         }),
@@ -402,6 +406,16 @@ export class ApexWebSocket {
         params: Record<string, any>,
         timeoutMs?: number,
     ): Promise<any> {
+        // if (functionName !== 'AuthenticateUser') {
+        //     const start = performance.now()
+        //     while (
+        //         (!this.ws || !this.isLogin) &&
+        //         performance.now() <
+        //             start + this.options.maxDelayTimeBeforeRetryConnect
+        //     ) {
+        //         await sleep(500)
+        //     }
+        // }
         return new Promise((resolve, reject) => {
             this.RPCCall(
                 functionName,
