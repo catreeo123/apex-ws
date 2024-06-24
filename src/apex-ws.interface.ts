@@ -71,6 +71,11 @@ export interface ApexWebSocketOptions {
      * global circuit breaker options setting for each endpoint.
      */
     circuitBreaker?: Omit<CircuitBreakerType.Options, 'timeout'>
+    ping?: {
+        interval?: number
+        failedDelay?: number
+        retryTimes?: number
+    }
 }
 
 export const enum MessageFrameType {
@@ -93,7 +98,7 @@ export interface MessageFrame {
 }
 
 export interface EndpointOptions {
-    forceThrowError?: boolean
+    throwError?: boolean
     maxRetry?: number
     timeoutMs?: number
 }

@@ -46,6 +46,12 @@ export class ApexWebSocket {
             maxDelayTimeBeforeRetryConnect: 30000,
             requestTimeout: 10000,
             ...options,
+            ping: {
+                interval: 300000,
+                failedDelay: 30000,
+                retryTimes: 5,
+                ...options.ping,
+            },
         }
         this.debugMode = !!options.debugMode
         if (options.logger) {
@@ -457,6 +463,7 @@ export class ApexWebSocket {
         const RPCPromiseBreaker = new CircuitBreaker(
             this.RPCPromise.bind(this),
             {
+                enabled: false,
                 ...this.options.circuitBreaker,
                 ...circuitBreakerOptions,
                 timeout: false,
@@ -474,7 +481,7 @@ export class ApexWebSocket {
         const endpoint = async (
             params: Record<string, any>,
             {
-                forceThrowError = false,
+                throwError = false,
                 maxRetry = 0,
                 retryCount = 1,
                 timeoutMs,
@@ -488,23 +495,23 @@ export class ApexWebSocket {
                     timeoutMs,
                 )
             } catch (error) {
-                this.logger.error({
-                    message: `AP ${functionName} retry ${currRetry} failed.`,
-                    error: convertErrorToJSON(error),
-                    metadata: { params },
-                })
-                if (currRetry > maxRetry) {
+                if (currRetry >= maxRetry) {
                     this.logger.error({
                         message: error.message,
                         error: convertErrorToJSON(error),
                         metadata: { params },
                     })
-                    if (forceThrowError) {
+                    if (throwError) {
                         throw error
                     }
                 } else {
+                    this.logger.error({
+                        message: `AP ${functionName} retry ${currRetry} failed.`,
+                        error: convertErrorToJSON(error),
+                        metadata: { params },
+                    })
                     return endpoint(params, {
-                        forceThrowError: forceThrowError,
+                        throwError: throwError,
                         maxRetry: maxRetry,
                         retryCount: retryCount + 1,
                         timeoutMs,
@@ -532,7 +539,7 @@ export class ApexWebSocket {
             } catch (error) {
                 this.close()
             }
-        }, 300000)
+        }, this.options.ping.interval)
     }
 
     private async authenticateUser(
@@ -550,7 +557,11 @@ export class ApexWebSocket {
     }
 
     private async ping() {
-        return await this.RPCPromise('Ping', { omsId: 1 }, 10000)
+        return this.retry(
+            () => this.RPCPromise('Ping', { omsId: 1 }, 10000),
+            this.options.ping.retryTimes,
+            this.options.ping.failedDelay,
+        )
     }
     /**
      * For create client and build endpoint from input endpoints for using in the future
@@ -571,5 +582,29 @@ export class ApexWebSocket {
 
     getPendingRequest() {
         return this.callback
+    }
+
+    async retry(cb: () => any, times: number, delay = 0) {
+        for (let attempt = 1; attempt <= times; attempt++) {
+            try {
+                return await cb()
+            } catch (error) {
+                if (attempt >= times) {
+                    this.logger.error({
+                        message: error.message,
+                        error: convertErrorToJSON(error),
+                    })
+                    throw error
+                }
+                this.logger.error({
+                    message: `AP retry ${attempt} failed.`,
+                    error: convertErrorToJSON(error),
+                })
+
+                if (delay > 0) {
+                    await sleep(delay)
+                }
+            }
+        }
     }
 }

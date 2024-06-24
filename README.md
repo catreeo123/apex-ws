@@ -116,6 +116,7 @@ export interface ApexWebSocketOptions {
 
     /** opposum circuit breaker option https://nodeshift.dev/opossum/#circuitbreaker
      * global circuit breaker options setting for each endpoint.
+     * circuit breaker is not enable by default set enable: true to enable it.
      */
     circuitBreaker?: Omit<CircuitBreakerType.Options, 'timeout'>
 }
