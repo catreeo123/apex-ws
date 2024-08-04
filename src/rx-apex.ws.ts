@@ -1,5 +1,6 @@
 import {
     BehaviorSubject,
+    config,
     distinctUntilChanged,
     exhaustMap,
     filter,
@@ -25,7 +26,7 @@ import {
 } from './apex-ws.interface'
 import { customDebug, customError, customLog } from './utils'
 
-export class RxApexWeboscket {
+export class RxApexWebSocket {
     private options: ApexWebSocketOptions
 
     #status$ = new BehaviorSubject<boolean>(false)
@@ -35,6 +36,7 @@ export class RxApexWeboscket {
 
     #retryCount = 0
     #seq = 0
+    #debugMode = false
 
     private logger: ApexWebSocketOptions['logger'] = {
         log: customLog,
@@ -43,10 +45,37 @@ export class RxApexWeboscket {
     }
 
     constructor(options: ApexWebSocketOptions) {
-        this.options = options
+        this.options = {
+            prettyPrint: false,
+            delayBeforeRetryConnect: 1000,
+            delayTypeBeforeRetryConnect: 'fixed',
+            maxDelayTimeBeforeRetryConnect: 30000,
+            requestTimeout: 10000,
+            ...options,
+            ping: {
+                interval: 300000,
+                failedDelay: 30000,
+                retryTimes: 5,
+                ...options.ping,
+            },
+        }
+        this.#debugMode = !!options.debugMode
+        if (options.logger) {
+            this.logger = options.logger
+        }
+        config.onUnhandledError = (err) => {
+            this.logger.error({
+                message: 'unhandled error of rxjs',
+                error: {
+                    message: err.message,
+                    stack: err.stack,
+                    kind: err.name,
+                },
+            })
+        }
     }
 
-    private connect() {
+    connect() {
         this.createWebSocket()
         this.connectionStatus$
             .pipe(
@@ -76,6 +105,7 @@ export class RxApexWeboscket {
         openObserver.subscribe(() => {
             this.logger.log({ message: 'AP: Connection established' })
             this.#status$.next(true)
+            this.login()
         })
         const closeObserver = new Subject<CloseEvent>()
         closeObserver.subscribe(() => {
@@ -102,7 +132,7 @@ export class RxApexWeboscket {
                     delay: (error, retryCount) => {
                         this.#status$.next(false)
                         this.logger.error({
-                            message: `AP: Connection error: ${error.message}}. Retry to connect`,
+                            message: `AP: Connection error: ${error.message}. Retry to connect`,
                             error: {
                                 message: error.message,
                                 stack: error.stack,
@@ -114,7 +144,11 @@ export class RxApexWeboscket {
                     },
                 }),
             )
-            .subscribe(this.messages$)
+            .subscribe({
+                next: (message) => {
+                    this.messages$.next(message)
+                },
+            })
     }
 
     private serializer(value: object): string {
@@ -169,7 +203,7 @@ export class RxApexWeboscket {
     }
 
     sendMessage(message: MessageFrame) {
-        if (this.options.debugMode) {
+        if (this.#debugMode) {
             const dataToLog = {
                 ...(message.o as Record<string, any>),
             }
@@ -249,13 +283,13 @@ export class RxApexWeboscket {
     private checkWebsocketConnection() {
         this.connectionStatus$
             .pipe(
+                take(1),
                 filter((status) => !status),
                 mergeMap(() =>
                     throwError(
                         () => new Error('AP: Websocket is not connected'),
                     ),
                 ),
-                take(1),
             )
             .subscribe({
                 error: (error) => {
