@@ -293,7 +293,7 @@ export class ApexWebSocket {
     close() {
         if (this.ws) {
             this.logger.log({ message: 'AP: Connection is closing' })
-            this.ws.complete()
+            this.ws.unsubscribe()
             this.ws = undefined
         }
     }
