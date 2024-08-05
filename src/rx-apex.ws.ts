@@ -146,7 +146,7 @@ export class RxApexWebSocket {
             )
             .subscribe({
                 next: (message) => {
-                    this.messages$.next(message)
+                    // this.messages$.next(message)
                 },
             })
     }
@@ -252,18 +252,15 @@ export class RxApexWebSocket {
     ): Promise<any> {
         return new Promise((resolve, reject) => {
             const seq = this.#seq
-            this.RPCCall(functionName, params, seq)
             this.messages$
                 .pipe(
                     timeout({
                         each: timeoutMs,
-                        with: () =>
-                            throwError(
-                                () =>
-                                    new Error(
-                                        `AP ${functionName} ${seq}: Request Timeout`,
-                                    ),
-                            ),
+                        with: () => {
+                            throw new Error(
+                                `AP ${functionName} ${seq}: Request Timeout`,
+                            )
+                        },
                     }),
                     filter(
                         (message) =>
@@ -277,6 +274,7 @@ export class RxApexWebSocket {
                     next: (data) => resolve(data.o),
                     error: (error: Error) => reject(error),
                 })
+            this.RPCCall(functionName, params, seq)
         })
     }
 
