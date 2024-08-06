@@ -1,16 +1,20 @@
 import {
     BehaviorSubject,
+    concatMap,
     config,
     distinctUntilChanged,
     exhaustMap,
     filter,
+    from,
     lastValueFrom,
     mergeMap,
     Observable,
+    OperatorFunction,
     retry,
     skip,
     Subject,
     take,
+    takeUntil,
     tap,
     throwError,
     timeout,
@@ -63,14 +67,14 @@ export class RxApexWebSocket {
         if (options.logger) {
             this.logger = options.logger
         }
-        config.onUnhandledError = (err) => {
+        config.onUnhandledError = (error) => {
             this.logger.error({
-                message: 'unhandled error of rxjs',
-                error: {
-                    message: err.message,
-                    stack: err.stack,
-                    kind: err.name,
-                },
+                message: `unhandled error of rxjs ${error.message}`,
+                // error: {
+                //     message: err.message,
+                //     stack: err.stack,
+                //     kind: err.name,
+                // },
             })
         }
     }
@@ -98,15 +102,62 @@ export class RxApexWebSocket {
     }
 
     private createWebSocket() {
+        this.logger.log({ message: 'AP: Creating Websocket' })
         if (this.ws) {
             this.ws.unsubscribe()
         }
+        this.#seq = 0
         const openObserver = new Subject<Event>()
-        openObserver.subscribe(() => {
-            this.logger.log({ message: 'AP: Connection established' })
-            this.#status$.next(true)
-            this.login()
-        })
+        openObserver
+            .pipe(
+                tap(() => {
+                    this.logger.log({ message: 'AP: Connection established' })
+                    this.#status$.next(true)
+                }),
+                concatMap(() => from(this.login())),
+                tap(() => {
+                    this.logger.log({
+                        message: `AP: Websocket start successfully`,
+                    })
+                }),
+                concatMap(() =>
+                    timer(0, this.options.ping.interval).pipe(
+                        tap(console.log),
+                        concatMap(() => {
+                            return from(this.RPCPromise('Ping', {})).pipe(
+                                retry({
+                                    count: this.options.ping.retryTimes,
+                                    delay: () => {
+                                        console.log('retry')
+                                        return timer(
+                                            this.options.ping.failedDelay,
+                                        )
+                                    },
+                                }),
+                            )
+                        }),
+                        takeUntil(this.connectionStatus$.pipe(skip(1))),
+                    ),
+                ),
+            )
+            .subscribe({
+                next: (message) => {
+                    this.logger.log({
+                        message: `AP: Ping successfully return message: ${message?.msg}`,
+                    })
+                },
+                error: (error) => {
+                    this.logger.error({
+                        message: `AP: Open Observer error ${error.message}`,
+                        // error: {
+                        //     message: error.message,
+                        //     stack: error.stack,
+                        //     kind: error.name,
+                        // },
+                    })
+                    this.#status$.next(false)
+                },
+            })
         const closeObserver = new Subject<CloseEvent>()
         closeObserver.subscribe(() => {
             this.logger.log({ message: 'AP: Received close event' })
@@ -146,7 +197,7 @@ export class RxApexWebSocket {
             )
             .subscribe({
                 next: (message) => {
-                    // this.messages$.next(message)
+                    this.messages$.next(message)
                 },
             })
     }
@@ -234,7 +285,19 @@ export class RxApexWebSocket {
         data: Record<string, any>,
         seq: number,
     ) {
-        this.checkWebsocketConnection()
+        const messageFrame: MessageFrame = this.createMessageFrame(
+            seq,
+            functionName,
+            data,
+        )
+        this.sendMessage(messageFrame)
+    }
+
+    private createMessageFrame(
+        seq: number,
+        functionName: string,
+        data: Record<string, any>,
+    ) {
         const messageFrame: MessageFrame = {
             m: MessageFrameType.REQUEST,
             i: seq,
@@ -242,7 +305,7 @@ export class RxApexWebSocket {
             o: data,
         }
         this.#seq += 2
-        this.sendMessage(messageFrame)
+        return messageFrame
     }
 
     private RPCPromise(
@@ -252,22 +315,16 @@ export class RxApexWebSocket {
     ): Promise<any> {
         return new Promise((resolve, reject) => {
             const seq = this.#seq
+            this.checkWebsocketConnection({ functionName, seq })
             this.messages$
                 .pipe(
-                    timeout({
-                        each: timeoutMs,
-                        with: () => {
-                            throw new Error(
-                                `AP ${functionName} ${seq}: Request Timeout`,
-                            )
-                        },
-                    }),
                     filter(
                         (message) =>
                             message.n === functionName &&
                             message.i === seq &&
                             message.m === MessageFrameType.REPLY,
                     ),
+                    this.requestTimeout(functionName, seq, timeoutMs),
                     take(1),
                 )
                 .subscribe({
@@ -278,14 +335,23 @@ export class RxApexWebSocket {
         })
     }
 
-    private checkWebsocketConnection() {
+    private checkWebsocketConnection({
+        functionName,
+        seq,
+    }: {
+        functionName: string
+        seq: number
+    }) {
         this.connectionStatus$
             .pipe(
                 take(1),
                 filter((status) => !status),
                 mergeMap(() =>
                     throwError(
-                        () => new Error('AP: Websocket is not connected'),
+                        () =>
+                            new Error(
+                                `AP ${functionName} ${seq}: Websocket is not connected`,
+                            ),
                     ),
                 ),
             )
@@ -293,11 +359,11 @@ export class RxApexWebSocket {
                 error: (error) => {
                     this.logger.error({
                         message: error.message,
-                        error: {
-                            message: error.message,
-                            stack: error.stack,
-                            kind: error.name,
-                        },
+                        // error: {
+                        //     message: error.message,
+                        //     stack: error.stack,
+                        //     kind: error.name,
+                        // },
                     })
                     throw error
                 },
@@ -320,15 +386,16 @@ export class RxApexWebSocket {
                 },
             })
         } catch (error) {
-            this.logger.error({
-                message: `AP: login error: ${error.message}`,
-                error: {
-                    message: error.message,
-                    stack: error.stack,
-                    kind: error.name,
-                },
-            })
+            // this.logger.error({
+            //     message: `AP: login error: ${error.message}`,
+            //     error: {
+            //         message: error.message,
+            //         stack: error.stack,
+            //         kind: error.name,
+            //     },
+            // })
             this.#isLogin$.next(false)
+            throw error
         }
     }
 
@@ -347,5 +414,20 @@ export class RxApexWebSocket {
             { username, password },
             10000,
         )
+    }
+
+    private requestTimeout<T>(
+        functionName: string,
+        seq: number,
+        timeoutMs?: number,
+    ): OperatorFunction<T, T> {
+        return timeout({
+            each: timeoutMs || this.options.requestTimeout,
+            with: () =>
+                throwError(
+                    () =>
+                        new Error(`AP ${functionName} ${seq}: Request Timeout`),
+                ),
+        })
     }
 }
